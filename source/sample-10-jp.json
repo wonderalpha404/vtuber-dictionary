@@ -69,12 +69,12 @@
     "uuid": "da1e9a7e-c6c4-5a1c-bd27-436eb0aa6112",
     "name": "P丸様",
     "reading": "ぴーまるさま",
-    "source": "https://ja.wikipedia.org/wiki/P%E4%B8%B8%E6%A7%98%E3%80%82; https://www.animatetimes.com/tag/details.php?id=24341",
+    "source": "https://ja.wikipedia.org/wiki/P%E4%B8%B8%E6%A7%98%E3%80%82",
     "source_type": "official_website_wiki",
     "confidence": "high",
     "status": "verified",
-    "checked_at": "2026-09-06T17:23:11Z",
-    "notes": "Multiple reliable sources confirm the reading: Wikipedia lists 'ぴーまるさま', Anime Times profile shows 'ふりがな: ぴーまるさま'. The reading is consistently ぴーまるさま (pi-maru-sama)."
+    "checked_at": "2026-09-06T17:46:23Z",
+    "notes": "Sources confirming reading: Wikipedia (https://ja.wikipedia.org/wiki/P%E4%B8%B8%E6%A7%98%E3%80%82), Utaten artist page (https://utaten.com/artist/39622/), WEBザテレビジョン profile (https://thetv.jp/person/2000088055/), official site (https://pmarusama.com/). All show reading ぴーまるさま."
   },
   {
     "uuid": "672b6fe5-8e2a-54d9-bb9d-61175220cec1",
