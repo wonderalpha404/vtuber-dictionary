@@ -38,8 +38,8 @@ def find_vtuber_entry(data: list, name: str) -> dict:
 
 def find_vdb_entry(vdb_data: dict, uuid: str) -> Optional[dict]:
     """Find VTuber entry in VDB by UUID."""
-    vtubers = vdb_data.get('vtubers', [])
-    for vtuber in vtubers:
+    vtbs = vdb_data.get('vtbs', [])
+    for vtuber in vtbs:
         if vtuber.get('uuid') == uuid:
             return vtuber
     return None
@@ -131,7 +131,7 @@ def call_openrouter_api(prompt: str) -> str:
         {
             "type": "function",
             "function": {
-                "name": "web_search",
+                "name": "openrouter:web_search",
                 "description": "Search the web for information",
                 "parameters": {
                     "type": "object",
