@@ -4,6 +4,7 @@
 import json
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -312,6 +313,55 @@ def parse_ai_response(content: str) -> dict:
     return result
 
 
+def save_research_result(
+    sample_file: Path,
+    ai_result: dict,
+) -> None:
+    """Save AI research result to sample-10-jp.json."""
+    sample_data = load_json_file(str(sample_file))
+
+    target_entry = None
+    target_index = None
+
+    for i, entry in enumerate(sample_data):
+        if entry.get("name") == "P丸様":
+            target_entry = entry
+            target_index = i
+            break
+
+    if target_entry is None:
+        print(
+            "Error: P丸様 not found in sample-10-jp.json",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    now_utc = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    sample_data[target_index]["reading"] = ai_result["reading"]
+    sample_data[target_index]["source"] = ai_result["source"]
+    sample_data[target_index]["source_type"] = ai_result["source_type"]
+    sample_data[target_index]["confidence"] = ai_result["confidence"]
+    sample_data[target_index]["status"] = ai_result["status"]
+    sample_data[target_index]["notes"] = ai_result["notes"]
+    sample_data[target_index]["checked_at"] = now_utc
+
+    try:
+        with open(sample_file, "w", encoding="utf-8") as f:
+            json.dump(
+                sample_data,
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+    except IOError as e:
+        print(
+            f"Error: Failed to write to {sample_file}: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def main():
     """Main execution function."""
     script_dir = Path(__file__).parent.parent
@@ -345,6 +395,8 @@ def main():
     ai_response = call_openrouter_api(prompt)
 
     result = parse_ai_response(ai_response)
+
+    save_research_result(sample_file, result)
 
     print("Research result:")
     print(
