@@ -211,7 +211,7 @@ def call_openrouter_api(prompt: str) -> str:
     return content
 
 
-def parse_ai_response(content: str) -> dict:
+def parse_ai_response(content: str, vtuber_name: str) -> dict:
     """Parse and validate AI response JSON."""
     content = content.strip()
 
@@ -256,10 +256,10 @@ def parse_ai_response(content: str) -> dict:
             )
             sys.exit(1)
 
-    if result["name"] != "P丸様":
+    if result["name"] != vtuber_name:
         print(
             f"Error: AI response name '{result['name']}' "
-            "does not match 'P丸様'",
+            f"does not match '{vtuber_name}'",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -316,6 +316,7 @@ def parse_ai_response(content: str) -> dict:
 def save_research_result(
     sample_file: Path,
     ai_result: dict,
+    vtuber_name: str,
 ) -> None:
     """Save AI research result to sample-10-jp.json."""
     sample_data = load_json_file(str(sample_file))
@@ -324,14 +325,14 @@ def save_research_result(
     target_index = None
 
     for i, entry in enumerate(sample_data):
-        if entry.get("name") == "P丸様":
+        if entry.get("name") == vtuber_name:
             target_entry = entry
             target_index = i
             break
 
     if target_entry is None:
         print(
-            "Error: P丸様 not found in sample-10-jp.json",
+            f"Error: {vtuber_name} not found in sample-10-jp.json",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -364,6 +365,15 @@ def save_research_result(
 
 def main():
     """Main execution function."""
+    if len(sys.argv) < 2:
+        print(
+            "Error: VTuber name must be provided as a command-line argument",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    vtuber_name = sys.argv[1]
+
     script_dir = Path(__file__).parent.parent
 
     sample_file = (
@@ -376,7 +386,7 @@ def main():
 
     entry = find_vtuber_entry(
         sample_data,
-        "P丸様",
+        vtuber_name,
     )
 
     vdb_entry = find_vdb_entry(
@@ -394,9 +404,9 @@ def main():
     # Call OpenRouter API once.
     ai_response = call_openrouter_api(prompt)
 
-    result = parse_ai_response(ai_response)
+    result = parse_ai_response(ai_response, vtuber_name)
 
-    save_research_result(sample_file, result)
+    save_research_result(sample_file, result, vtuber_name)
 
     print("Research result:")
     print(
