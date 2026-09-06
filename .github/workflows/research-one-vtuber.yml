@@ -3,6 +3,9 @@ name: Research One VTuber
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   research:
     runs-on: ubuntu-latest
