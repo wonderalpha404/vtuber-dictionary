@@ -1,4 +1,3 @@
-````python
 #!/usr/bin/env python3
 """Research script for a single vtuber using OpenRouter API with web search."""
 
@@ -359,4 +358,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-````
