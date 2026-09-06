@@ -90,13 +90,13 @@
   {
     "uuid": "e8843c48-a666-5ebb-acc8-42da7f3a7d23",
     "name": "YUA/藤崎由愛",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "reading": "ふじさきゆあ",
+    "source": "https://www.youtube.com/watch?v=6e6iREg8iBw",
+    "source_type": "official video",
+    "confidence": "high",
+    "status": "verified",
+    "checked_at": "2026-09-06T17:59:01Z",
+    "notes": "Official YouTube self-introduction: https://www.youtube.com/watch?v=6e6iREg8iBw; Pixiv dictionary entry confirming reading: https://dic.pixiv.net/a/%E8%97%A4%E5%B4%8E%E7%94%B1%E6%84%9B"
   },
   {
     "uuid": "6ef3c1ef-b5a9-57e8-a7d8-1ffb696c87ec",
