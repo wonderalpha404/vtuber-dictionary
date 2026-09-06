@@ -2,13 +2,13 @@
   {
     "uuid": "259ab452-9cd4-5f08-b5af-f92789631f34",
     "name": "-official-Spi酱",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "reading": "spi",
+    "source": "https://spi-official.jp/",
+    "source_type": "official website",
+    "confidence": "medium",
+    "status": "review",
+    "checked_at": "2026-09-06T19:15:29Z",
+    "notes": "Official website spi-official.jp uses lowercase \"spi\" as the VTuber's name and greeting \"spi desu\". The reading is based on the official website's own usage. No explicit reading of the full \"-official-Spi酱\" name including the \"酱\" suffix was found; the \"酱\" may be a suffix without pronunciation change."
   },
   {
     "uuid": "9065ed39-5540-59c0-8587-81b4450a597d",
@@ -17,20 +17,20 @@
     "source": "",
     "source_type": "",
     "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "status": "unknown",
+    "checked_at": "2026-09-06T19:15:45Z",
+    "notes": "Searched for '2丫_ニーヤ' and 'ニーヤ VTuber' but found no reliable official sources or third-party information confirming a specific reading of this VTuber's name. The katakana ニーヤ appears in the name itself, which could suggest 'Niiya' as a reading, but per instructions, this cannot be inferred from general kana pronunciation without evidence from official or trustworthy sources. No evidence found."
   },
   {
     "uuid": "ef6f0b67-da6b-5bfa-bd35-b2dea6e378df",
     "name": "Caramel_奶糖",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "reading": "きゃらめる",
+    "source": "https://vtuber-live.net/channel/UCFFiZvBx302NskXHVKw_Khw",
+    "source_type": "third_party",
+    "confidence": "review",
+    "status": "review",
+    "checked_at": "2026-09-06T19:17:05Z",
+    "notes": "VDB auxiliary info provides jp: キャラメル, default: cn. Search did not return direct official channel for VTuber 'Caramel_奶糖' (UUID ef6f0b67-da6b-5bfa-bd35-b2dea6e378df). The Japanese reading きゃらめる corresponds to a different VTuber (きゃらめる / @caramel_715 / @caramel_vtuber, YouTube UCFFiZvBx302NskXHVKw_Khw), confirmed on vtuber-live.net. Cannot verify that this is the same VTuber as the one in VDB without additional evidence linking the UUID to that channel. The reading キャラメル (kyarameru) for the word 'caramel' is standard, but the proper noun reading きゃらめる (kyarameru, voiced) cannot be confirmed for the specific VTuber 'Caramel_奶糖'. Marked for review due to inability to confirm the specific VTuber identity."
   },
   {
     "uuid": "85965429-96ed-5f25-9f58-185f67538c5e",
@@ -39,9 +39,9 @@
     "source": "",
     "source_type": "",
     "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "status": "unknown",
+    "checked_at": "2026-09-06T19:19:02Z",
+    "notes": "No reliable sources found providing the official reading of this VTuber's name. While the kanji 多宇 has a general reading of たう (tau) in Japanese name dictionaries, this does not confirm the specific reading used by the VTuber. No official profile, official SNS, or trustworthy third-party source was found that explicitly states the name's reading."
   },
   {
     "uuid": "5393ac4b-e2fb-5b7e-a9cc-ef162c72c1c0",
@@ -79,13 +79,13 @@
   {
     "uuid": "672b6fe5-8e2a-54d9-bb9d-61175220cec1",
     "name": "UTAGOE放送部",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "reading": "ウタゴエ放送部",
+    "source": "https://fantia.jp/fanclubs/219730",
+    "source_type": "official_fanclub",
+    "confidence": "high",
+    "status": "verified",
+    "checked_at": "2026-09-06T19:19:53Z",
+    "notes": "Multiple official sources confirm the reading: Fantia official fanclub page shows 'ウタゴエ放送部 (ウタゴエ放送部公式)', TuneCore Japan artist page shows 'ウタゴエ放送部', and Moegirl Encyclopedia lists the Japanese reading as 'ウタゴエ放送部プロジェクト'. The romanized version 'UTAGOE' corresponds to 'ウタゴエ' which derives from '歌声' (utagoe) meaning 'singing voice'. Sources: Fantia (fantia.jp/fanclubs/219730), TuneCore Japan (tunecore.co.jp/artists/utabu), Moegirl Encyclopedia (mzh.moegirl.tw/Utagoe放送部project), V-tieup (v-tieup.net/utagoe/)"
   },
   {
     "uuid": "e8843c48-a666-5ebb-acc8-42da7f3a7d23",
@@ -105,8 +105,8 @@
     "source": "",
     "source_type": "",
     "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "status": "unknown",
+    "checked_at": "2026-09-06T19:19:58Z",
+    "notes": "No reliable sources found via web search to confirm the reading of this VTuber's name. The name consists of non-kanji characters (Latin letters 'dudulu' followed by the hiragana iteration mark 'く'), and no official channel or third-party database provided an explicit reading. Search returned no matching VTuber profile for the given UUID or name."
   }
 ]
