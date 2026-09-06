@@ -1,4 +1,3 @@
-```yaml
 name: Research One VTuber
 
 on:
@@ -24,4 +23,3 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: python scripts/research_one_vtuber.py
-```
