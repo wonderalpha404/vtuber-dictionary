@@ -1,0 +1,23 @@
+name: Run Sample 10
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Generate sample 10
+        run: python scripts/generate_sample10.py
+
+      - name: Show generated JSON
+        run: cat source/sample-10.json
