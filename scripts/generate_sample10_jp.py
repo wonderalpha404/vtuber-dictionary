@@ -10,34 +10,46 @@ OUTPUT_PATH = Path("source/sample-10-jp.json")
 MAX_ITEMS = 10
 
 
-def get_display_name(entry):
+def get_name_values(entry):
     name = entry.get("name")
 
     if not isinstance(name, dict):
+        return {}
+
+    result = {}
+
+    for key, value in name.items():
+        if isinstance(value, str) and value.strip():
+            result[key] = value.strip()
+
+    return result
+
+
+def get_display_name(entry):
+    name_values = get_name_values(entry)
+
+    if not name_values:
         return ""
 
-    default_key = name.get("default")
+    default_key = entry.get("name", {}).get("default")
 
     if isinstance(default_key, str):
-        value = name.get(default_key)
-        if isinstance(value, str) and value:
+        value = name_values.get(default_key)
+        if value:
             return value
 
-    for key in ("jp", "cn", "en"):
-        value = name.get(key)
-        if isinstance(value, str) and value:
+    for key in ("jp", "ja", "cn", "en"):
+        value = name_values.get(key)
+        if value:
             return value
 
-    for value in name.values():
-        if isinstance(value, str) and value:
-            return value
-
-    return ""
+    return next(iter(name_values.values()))
 
 
 def has_japanese_script(text):
     for char in text:
         code = ord(char)
+
         if (
             0x3040 <= code <= 0x309F
             or 0x30A0 <= code <= 0x30FF
@@ -47,6 +59,34 @@ def has_japanese_script(text):
             return True
 
     return False
+
+
+def japanese_score(entry):
+    """
+    日本語向け候補を優先するための簡易スコア。
+
+    高い順:
+    - name.jp が存在する
+    - name.ja が存在する
+    - 日本語文字を含む
+    """
+
+    name_values = get_name_values(entry)
+
+    score = 0
+
+    if name_values.get("jp"):
+        score += 100
+
+    if name_values.get("ja"):
+        score += 90
+
+    display_name = get_display_name(entry)
+
+    if has_japanese_script(unicodedata.normalize("NFKC", display_name)):
+        score += 10
+
+    return score
 
 
 def main():
@@ -83,7 +123,7 @@ def main():
         )
         return 4
 
-    selected = []
+    candidates = []
     seen_names = set()
 
     for entry in vtbs:
@@ -111,10 +151,27 @@ def main():
 
         seen_names.add(normalized)
 
+        candidates.append(
+            {
+                "entry": entry,
+                "name": name,
+                "score": japanese_score(entry),
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: (-item["score"], item["name"])
+    )
+
+    selected = []
+
+    for candidate in candidates[:MAX_ITEMS]:
+        entry = candidate["entry"]
+
         selected.append(
             {
                 "uuid": entry.get("uuid", ""),
-                "name": name,
+                "name": candidate["name"],
                 "reading": "",
                 "source": "",
                 "source_type": "",
@@ -124,9 +181,6 @@ def main():
                 "notes": "",
             }
         )
-
-        if len(selected) == MAX_ITEMS:
-            break
 
     if len(selected) != MAX_ITEMS:
         print(
@@ -147,7 +201,9 @@ def main():
         )
         f.write("\n")
 
-    print(f"Successfully wrote {len(selected)} entries to {OUTPUT_PATH}")
+    print(
+        f"Successfully wrote {len(selected)} entries to {OUTPUT_PATH}"
+    )
 
     print("Selected VTubers:")
     for index, item in enumerate(selected, start=1):
