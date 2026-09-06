@@ -1,46 +1,44 @@
 name: Research One VTuber
 
 on:
-workflow_dispatch:
-inputs:
-vtuber_name:
-description: 'Research target VTuber name'
-required: true
+  workflow_dispatch:
+    inputs:
+      vtuber_name:
+        description: 'Research target VTuber name'
+        required: true
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-research:
-runs-on: ubuntu-latest
+  research:
+    runs-on: ubuntu-latest
 
-```
-steps:
-  - name: Checkout
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  - name: Setup Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: "3.x"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-  - name: Install requests
-    run: pip install requests
+      - name: Install requests
+        run: pip install requests
 
-  - name: Research VTuber
-    env:
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-    run: python scripts/research_one_vtuber.py "${{ inputs.vtuber_name }}"
+      - name: Research VTuber
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: python scripts/research_one_vtuber.py "${{ inputs.vtuber_name }}"
 
-  - name: Commit and push changes
-    run: |
-      git config user.name "github-actions[bot]"
-      git config user.email "github-actions[bot]@users.noreply.github.com"
-      git add source/sample-10-jp.json
-      if git diff --cached --quiet; then
-        echo "No changes to commit"
-      else
-        git commit -m "Update research result"
-        git push
-      fi
-```
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add source/sample-10-jp.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update research result"
+            git push
+          fi
