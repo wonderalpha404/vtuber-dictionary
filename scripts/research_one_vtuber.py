@@ -719,50 +719,12 @@ def request_openrouter_once(uuid, name, prompt, attempt):
     return content
 
 
-def request_openrouter(uuid, name, prompt):
-    last_error = None
-
-    for attempt in range(1, MAX_API_ATTEMPTS + 1):
-        try:
-            return request_openrouter_once(
-                uuid=uuid,
-                name=name,
-                prompt=prompt,
-                attempt=attempt,
-            )
-
-        except Exception as exc:
-            last_error = exc
-
-            log(
-                f"OPENROUTER ATTEMPT FAILED "
-                f"name={name} uuid={uuid} "
-                f"attempt={attempt}/{MAX_API_ATTEMPTS} "
-                f"error_type={type(exc).__name__} "
-                f"message={exc}"
-            )
-
-            if attempt >= MAX_API_ATTEMPTS:
-                log(
-                    f"OPENROUTER ALL ATTEMPTS FAILED "
-                    f"name={name} uuid={uuid} "
-                    f"attempts={MAX_API_ATTEMPTS}"
-                )
-                raise
-
-            delay = RETRY_DELAYS[attempt - 1]
-
-            log(
-                f"OPENROUTER RETRY SCHEDULED "
-                f"name={name} uuid={uuid} "
-                f"next_attempt={attempt + 1}/{MAX_API_ATTEMPTS} "
-                f"wait={delay}s"
-            )
-
-            time.sleep(delay)
-
-    raise RuntimeError(
-        f"OpenRouter failed after {MAX_API_ATTEMPTS} attempts: {last_error}"
+def request_openrouter(uuid, name, prompt, attempt):
+    return request_openrouter_once(
+        uuid=uuid,
+        name=name,
+        prompt=prompt,
+        attempt=attempt,
     )
 
 
@@ -884,154 +846,180 @@ def research(uuid, name):
         f"prompt_length={len(prompt)}"
     )
 
-    try:
-        content = request_openrouter(
-            uuid=uuid,
-            name=name,
-            prompt=prompt,
-        )
+    last_error = None
 
-        log(
-            f"AI RESPONSE RECEIVED "
-            f"name={name} "
-            f"content_length={len(content)}"
-        )
-
+    for attempt in range(1, MAX_API_ATTEMPTS + 1):
         try:
-            data = extract_json_object(content)
-
-        except ValueError as exc:
-            log(
-                f"AI RESPONSE PARSE FAILED "
-                f"name={name} "
-                f"error_type=invalid_json"
-            )
-
-            preview = content[:1000].replace("\n", "\\n")
-
-            log(
-                f"AI RESPONSE START PREVIEW: {preview}"
-            )
-
-            if len(content) > 1000:
-                end_preview = content[-1000:].replace("\n", "\\n")
-
-                log(
-                    f"AI RESPONSE END PREVIEW: {end_preview}"
-                )
-
-            raise ValueError(
-                "Failed to parse AI response as a JSON object"
-            ) from exc
-
-        log(
-            f"AI JSON PARSED "
-            f"name={name} uuid={uuid}"
-        )
-
-        data = validate_result(
-            data=data,
-            uuid=uuid,
-            name=name,
-        )
-
-        finished_at = utc_now()
-
-        result = {
-            "uuid": data["uuid"],
-            "name": data["name"],
-            "reading": data["reading"],
-            "source": data["source"],
-            "source_type": data["source_type"],
-            "confidence": data["confidence"],
-            "status": data["status"],
-            "notes": data["notes"],
-            "checked_at": finished_at,
-            "last_attempted_at": finished_at,
-            "last_attempt_result": "success",
-        }
-
-        upsert_result(result)
-
-        log(
-            f"RESULT SAVED "
-            f"name={name} "
-            f"uuid={uuid} "
-            f"reading={result['reading']} "
-            f"status={result['status']} "
-            f"confidence={result['confidence']}"
-        )
-
-        log(
-            f"RESEARCH SUCCESS "
-            f"name={name} uuid={uuid}"
-        )
-
-        return 0
-
-    except Exception as exc:
-        existing = None
-
-        try:
-            existing = get_existing_result(uuid)
-        except Exception as load_exc:
-            log(
-                f"EXISTING RESULT LOAD FAILED "
-                f"name={name} "
-                f"uuid={uuid} "
-                f"error_type={type(load_exc).__name__} "
-                f"message={load_exc}"
-            )
-
-        if (
-            existing is not None
-            and existing.get("status") in ALLOWED_STATUS
-            and existing.get("last_attempt_result") == "success"
-        ):
-            log(
-                f"EXISTING SUCCESS RESULT NOT OVERWRITTEN "
-                f"name={name} "
-                f"uuid={uuid} "
-                f"status={existing.get('status')}"
-            )
-
-        else:
-            failure = make_failure_record(
+            content = request_openrouter(
                 uuid=uuid,
                 name=name,
-                started_at=started_at,
-                existing=existing,
+                prompt=prompt,
+                attempt=attempt,
+            )
+
+            log(
+                f"AI RESPONSE RECEIVED "
+                f"name={name} "
+                f"uuid={uuid} "
+                f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+                f"content_length={len(content)}"
             )
 
             try:
-                upsert_result(failure)
+                data = extract_json_object(content)
 
+            except ValueError as exc:
                 log(
-                    f"FAILURE STATE SAVED "
-                    f"name={name} "
-                    f"uuid={uuid} "
-                    f"status=pending "
-                    f"last_attempt_result=error"
+                    f"AI RESPONSE PARSE FAILED "
+                    f"name={name} uuid={uuid} "
+                    f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+                    f"error_type=invalid_json "
+                    f"message={exc}"
                 )
 
-            except Exception as save_exc:
-                log(
-                    f"FAILURE STATE SAVE FAILED "
-                    f"name={name} "
-                    f"uuid={uuid} "
-                    f"error_type={type(save_exc).__name__} "
-                    f"message={save_exc}"
-                )
+                preview = content[:1000].replace("\n", "\\n")
+                log(f"AI RESPONSE START PREVIEW: {preview}")
 
+                if len(content) > 1000:
+                    end_preview = content[-1000:].replace("\n", "\\n")
+                    log(f"AI RESPONSE END PREVIEW: {end_preview}")
+
+                raise
+
+            log(
+                f"AI JSON PARSED "
+                f"name={name} uuid={uuid} "
+                f"attempt={attempt}/{MAX_API_ATTEMPTS}"
+            )
+
+            data = validate_result(
+                data=data,
+                uuid=uuid,
+                name=name,
+            )
+
+            finished_at = utc_now()
+
+            result = {
+                "uuid": data["uuid"],
+                "name": data["name"],
+                "reading": data["reading"],
+                "source": data["source"],
+                "source_type": data["source_type"],
+                "confidence": data["confidence"],
+                "status": data["status"],
+                "notes": data["notes"],
+                "checked_at": finished_at,
+                "last_attempted_at": finished_at,
+                "last_attempt_result": "success",
+            }
+
+            upsert_result(result)
+
+            log(
+                f"RESULT SAVED "
+                f"name={name} "
+                f"uuid={uuid} "
+                f"reading={result['reading']} "
+                f"status={result['status']} "
+                f"confidence={result['confidence']}"
+            )
+
+            log(
+                f"RESEARCH SUCCESS "
+                f"name={name} uuid={uuid} "
+                f"attempt={attempt}/{MAX_API_ATTEMPTS}"
+            )
+
+            return 0
+
+        except Exception as exc:
+            last_error = exc
+
+            log(
+                f"RESEARCH ATTEMPT FAILED "
+                f"name={name} uuid={uuid} "
+                f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+                f"error_type={type(exc).__name__} "
+                f"message={exc}"
+            )
+
+            if attempt >= MAX_API_ATTEMPTS:
+                break
+
+            delay = RETRY_DELAYS[attempt - 1]
+
+            log(
+                f"RESEARCH RETRY SCHEDULED "
+                f"name={name} uuid={uuid} "
+                f"next_attempt={attempt + 1}/{MAX_API_ATTEMPTS} "
+                f"wait={delay}s"
+            )
+
+            time.sleep(delay)
+
+    existing = None
+
+    try:
+        existing = get_existing_result(uuid)
+    except Exception as load_exc:
         log(
-            f"RESEARCH FAILED "
+            f"EXISTING RESULT LOAD FAILED "
             f"name={name} "
             f"uuid={uuid} "
-            f"error_type={type(exc).__name__} "
-            f"message={exc}"
+            f"error_type={type(load_exc).__name__} "
+            f"message={load_exc}"
         )
 
-        return 1
+    if (
+        existing is not None
+        and existing.get("status") in ALLOWED_STATUS
+        and existing.get("last_attempt_result") == "success"
+    ):
+        log(
+            f"EXISTING SUCCESS RESULT NOT OVERWRITTEN "
+            f"name={name} "
+            f"uuid={uuid} "
+            f"status={existing.get('status')}"
+        )
+
+    else:
+        failure = make_failure_record(
+            uuid=uuid,
+            name=name,
+            started_at=started_at,
+            existing=existing,
+        )
+
+        try:
+            upsert_result(failure)
+
+            log(
+                f"FAILURE STATE SAVED "
+                f"name={name} "
+                f"uuid={uuid} "
+                f"status=pending "
+                f"last_attempt_result=error"
+            )
+
+        except Exception as save_exc:
+            log(
+                f"FAILURE STATE SAVE FAILED "
+                f"name={name} "
+                f"uuid={uuid} "
+                f"error_type={type(save_exc).__name__} "
+                f"message={save_exc}"
+            )
+
+    log(
+        f"RESEARCH FAILED "
+        f"name={name} "
+        f"uuid={uuid} "
+        f"error_type={type(last_error).__name__ if last_error else 'unknown'} "
+        f"message={last_error if last_error else 'unknown error'}"
+    )
+
+    return 1
 
 
 def main():
