@@ -1,0 +1,49 @@
+name: Once launch script
+
+on:
+  push:
+    paths:
+      - "once_launch_script/**"
+
+permissions:
+  contents: write
+
+jobs:
+  launch:
+    if: ${{ !contains(github.event.head_commit.message, '[once-launch-cleanup]') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Run newly added scripts
+        run: |
+          set -euo pipefail
+          git diff --name-status HEAD^ HEAD -- once_launch_script/ > /tmp/once_launch_changes
+
+          while IFS=$'\t' read -r status path; do
+            case "$status" in
+              A)
+                echo "Running: $path"
+                bash "$path"
+                ;;
+              *)
+                echo "Ignoring change: $status $path"
+                ;;
+            esac
+          done < /tmp/once_launch_changes
+
+      - name: Remove launch files
+        run: |
+          set -euo pipefail
+          find once_launch_script -type f ! -name '.gitkeep' -delete
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add once_launch_script
+          git diff --cached --quiet || git commit -m "[once-launch-cleanup] Remove executed launch scripts"
+          git push
