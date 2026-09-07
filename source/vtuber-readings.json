@@ -277,5 +277,31 @@
     "checked_at": "",
     "last_attempted_at": "2026-09-07T04:43:08Z",
     "last_attempt_result": "error"
+  },
+  {
+    "uuid": "5393ac4b-e2fb-5b7e-a9cc-ef162c72c1c0",
+    "name": "帝",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "unknown",
+    "notes": "",
+    "checked_at": "2026-09-07T07:01:30Z",
+    "last_attempted_at": "2026-09-07T07:01:30Z",
+    "last_attempt_result": "success"
+  },
+  {
+    "uuid": "35e48da1-ce7f-544b-a4a6-45bf312b0190",
+    "name": "ミライアカリ",
+    "reading": "みらいあかり",
+    "source": "https://dic.pixiv.net/a/%E3%83%9F%E3%83%A9%E3%82%A4%E3%82%A2%E3%82%AB%E3%83%AA",
+    "source_type": "vtuber_database",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Official site and Wikipedia identify the name as katakana 'ミライアカリ' (Mirai Akari); Pixiv Encyclopedia gives the reading as 'みらいあかり'.",
+    "checked_at": "2026-09-07T07:01:40Z",
+    "last_attempted_at": "2026-09-07T07:01:40Z",
+    "last_attempt_result": "success"
   }
 ]
