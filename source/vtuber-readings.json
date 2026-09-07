@@ -8,8 +8,9 @@
     "confidence": "",
     "status": "pending",
     "notes": "No reliable source found for the reading of this VTuber's name. Searched web but only found third-party mentions without reading information. URLs where name appears (but no reading provided): https://github.com/Shiro7940/Bilibili-Vtuber-Fan-Medal-Names/blob/main/vtbs.txt, https://moegirl.icu/User:TsanconBYin/2023%E6%B3%84%E9%9C%B2%E5%85%AC%E4%BC%9A%E5%90%8D%E5%8D%95",
-    "checked_at": "2026-09-07T04:07:12Z",
-    "last_attempt_result": ""
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T12:03:20Z",
+    "last_attempt_result": "technical_error"
   },
   {
     "uuid": "9065ed39-5540-59c0-8587-81b4450a597d",
@@ -167,11 +168,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "No reliable evidence establishes a specific Japanese reading (e.g., イヴ/イブ) for Eve SCP. The official Twitter handle (@Eve_scp), YouTube channel, upd8 listing, MoguLive article, Virtual YouTuber Wiki, and the VTuber's own self-introduction all refer to her only as 'Eve' or 'SCP-Eve' in Latin letters, with no kana or furigana indicating pronunciation. Wikipedia (Japanese) does not have an article for this VTuber. The name is an English proper noun (Eve) and the VTuber is referenced consistently by the Romanized form; no Japanese phonetic reading could be verified from any official or reliable third-party source.",
-    "checked_at": "2026-09-07T04:39:53Z",
-    "last_attempt_result": ""
+    "notes": "Searches for 'Eve SCP VTuber', 'Eve SCP イヴ', and related queries returned no reliable Japanese-language information establishing a Japanese reading for this specific VTuber. Results are dominated by the SCP Foundation 'SCP-EVE' entry, unrelated English-language SCP content, and the more prominent Japanese singer-songwriter 'Eve' (イヴ), none of which confirm a reading for 'Eve SCP' as a distinct VTuber.",
+    "checked_at": "2026-09-07T12:07:01Z",
+    "last_attempted_at": "2026-09-07T12:07:01Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "581b81c4-91be-5591-8f9f-8d22c2012a3e",
@@ -192,11 +194,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "No reliable evidence found for this VTuber. Extensive searches across official sources, VTuber databases, and third-party references did not return any results matching the exact name Haruru_Official with UUID 949fb22b-6aec-5014-a445-cf24d2ae32ca. Multiple VTubers with similar names exist (HaruRuu, 天晴Haruru, はるる, etc.) but none matched the exact identifier provided.",
-    "checked_at": "2026-09-07T04:40:56Z",
-    "last_attempt_result": ""
+    "notes": "No reliable evidence found linking this exact username to a verifiable VTuber reading. Extensive searches across VTuber databases, Twitter, YouTube, Twitch, and other platforms did not return results matching the specific UUID and exact username combination.",
+    "checked_at": "2026-09-07T12:07:27Z",
+    "last_attempted_at": "2026-09-07T12:07:27Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "85965429-96ed-5f25-9f58-185f67538c5e",
@@ -204,11 +207,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "No reliable source found establishing a Japanese reading for the name Jinlly多宇Official. The VTuber appears to be a Chinese (Bilibili) VTuber with the romanized given name 'Jinlly' and the character 多宇, but no official or established third-party source provides a Japanese pronunciation of the name. The name is written in Chinese characters and the 'Official' portion is English, so a distinct Japanese reading is not established.",
-    "checked_at": "2026-09-07T04:41:10Z",
-    "last_attempt_result": ""
+    "notes": "Chinese Bilibili VTuber (uid 2008705943, agency: melody事務所). No reliable Japanese reading established. The romanization 'Tau' appears in the YouTube channel name 'Jinlly Tau Channel' but no authoritative Japanese katakana rendering was found in official, Wikipedia, VTuber database (Bilibili vtbs.moe), or Japanese media sources. The YouTube display 'JINLLY多宇 －Jinlly Tau Channel－' appears to be machine-generated, not an official Japanese reading.",
+    "checked_at": "2026-09-07T12:08:17Z",
+    "last_attempted_at": "2026-09-07T12:08:17Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "4a40ea6a-a854-5ba4-aa64-6e3388f3b7b9",
@@ -261,14 +265,15 @@
   {
     "uuid": "19e4ef43-6a9d-5ff5-b79b-d59e8c98d19e",
     "name": "米プリンセス",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "No reliable evidence found establishing the actual Japanese reading of the name 米プリンセス for this specific VTuber (UUID 19e4ef43-6a9d-5ff5-b79b-d59e8c98d19e). The name contains the loanword プリンセス and the kanji 米, which could be read as こめ, よね, まい, べい, etc., but none can be confirmed without an official source. The VDB entry shows the default romanization as 'MaiPrincess', but this alone does not establish the Japanese reading.",
-    "checked_at": "2026-09-07T04:42:54Z",
-    "last_attempt_result": ""
+    "reading": "マイプリンセス",
+    "source": "Official YouTube channel description: 「米(マイ)プリンセス」",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "The kanji 米 is read as マイ (mai) per the official channel description. The group is also known in English as MAI PRINCESS.",
+    "checked_at": "2026-09-07T12:09:01Z",
+    "last_attempted_at": "2026-09-07T12:09:01Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "d63b7efc-26e9-5aa7-b905-d31450074f52",
@@ -286,15 +291,15 @@
   {
     "uuid": "5393ac4b-e2fb-5b7e-a9cc-ef162c72c1c0",
     "name": "帝",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:01:30Z",
-    "last_attempted_at": "2026-09-07T07:01:30Z",
-    "last_attempt_result": ""
+    "reading": "みかど",
+    "source": "https://vtuber-live.net/channel/UCO-FZDAG0mOvgu6jmGg1tiA",
+    "source_type": "vtuber_database",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "VTuber database entry for channel UCO-FZDAG0mOvgu6jmGg1tiA lists the name as 帝(みかど), affiliated with 星めぐり学園, matching the target uuid's channel.",
+    "checked_at": "2026-09-07T12:09:51Z",
+    "last_attempted_at": "2026-09-07T12:09:51Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "35e48da1-ce7f-544b-a4a6-45bf312b0190",
@@ -325,15 +330,15 @@
   {
     "uuid": "d6a47ef4-34b3-507f-90e7-4e966e973cc9",
     "name": "NoWorld_思绪イデア",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:03:19Z",
-    "last_attempted_at": "2026-09-07T07:03:19Z",
-    "last_attempt_result": ""
+    "reading": "イデア",
+    "source": "https://mzh.moegirl.org.cn/%E6%80%9D%E7%BB%AA(%E8%99%9A%E6%8B%9FUP%E4%B8%BB); https://chii.in/character/155889; https://history-links.com/?p=2886",
+    "source_type": "vtuber_database",
+    "confidence": "medium",
+    "status": "verified",
+    "notes": "The Japanese portion イデア is clearly established with multiple sources (萌娘百科, Bangumi, history-links) consistently showing this reading, confirmed by Twitter handle @idea_1029 and YouTube self-introduction '私はイデア教シスターのイデアと申します'. The Chinese portion 思绪 does not have an established Japanese reading in the sources consulted.",
+    "checked_at": "2026-09-07T12:10:15Z",
+    "last_attempted_at": "2026-09-07T12:10:15Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "87b4da4e-873a-5cc0-98b4-f1601c731443",
@@ -354,12 +359,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:03:28Z",
-    "last_attempted_at": "2026-09-07T07:03:28Z",
-    "last_attempt_result": ""
+    "notes": "This VTuber appears in the 2023 bilibili guild-leak dataset under 萌鸽传媒 (MoeLive) with the bilibili account 'Ohana緒' (uid 455630227). However, the account name 'Ohana緒' is a mixed-script handle (Roman 'Ohana' + kanji '緒') used on bilibili, and no official, Wikipedia, or established VTuber-database source was found that establishes a Japanese pronunciation/reading for this specific VTuber. 'Ohana' (Hawaiian/Japanese) is commonly read おはな, but applying that without direct confirmation from the VTuber's own materials would be guessing. No reliable reading can be established.",
+    "checked_at": "2026-09-07T12:11:36Z",
+    "last_attempted_at": "2026-09-07T12:11:36Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "1e77b8f1-6ab1-54e4-8fb8-a0f9c2c95de5",
@@ -403,15 +408,15 @@
   {
     "uuid": "6b4fe264-aa6e-5e59-828d-a250ba0509dd",
     "name": "リュウマ",
-    "reading": "",
-    "source": "",
-    "source_type": "",
+    "reading": "りゅうま",
+    "source": "deterministic:kana-only",
+    "source_type": "other",
     "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:04:03Z",
-    "last_attempted_at": "2026-09-07T07:04:03Z",
-    "last_attempt_result": ""
+    "status": "verified",
+    "notes": "name.jp is kana-only; reading was generated by deterministic kana conversion. Middle dot was not read.",
+    "checked_at": "2026-09-07T12:11:36Z",
+    "last_attempted_at": "2026-09-07T12:11:36Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "1f51b9de-04d9-586b-b826-51ec902664c2",
@@ -419,12 +424,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:04:10Z",
-    "last_attempted_at": "2026-09-07T07:04:10Z",
-    "last_attempt_result": ""
+    "notes": "No reliable source found for a VTuber named exactly '白夜チラ' with this UUID. Web searches returned only similarly named but distinct VTubers (e.g., 赤口 白夜/Shakko Byakuya, 橘 白夜/Tachibana Byakuya, 白夜 零兎/Shiraya Reito). The UUID 1f51b9de-04d9-586b-b826-51ec902664c2 did not appear in any VTuber database or official source.",
+    "checked_at": "2026-09-07T12:14:10Z",
+    "last_attempted_at": "2026-09-07T12:14:10Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "672b6fe5-8e2a-54d9-bb9d-61175220cec1",
