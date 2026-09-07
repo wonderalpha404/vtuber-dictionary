@@ -9,5 +9,29 @@
     "status": "unknown",
     "notes": "No reliable source found for the reading of this VTuber's name. Searched web but only found third-party mentions without reading information. URLs where name appears (but no reading provided): https://github.com/Shiro7940/Bilibili-Vtuber-Fan-Medal-Names/blob/main/vtbs.txt, https://moegirl.icu/User:TsanconBYin/2023%E6%B3%84%E9%9C%B2%E5%85%AC%E4%BC%9A%E5%90%8D%E5%8D%95",
     "checked_at": "2026-09-07T04:07:12Z"
+  },
+  {
+    "uuid": "9065ed39-5540-59c0-8587-81b4450a597d",
+    "name": "ニーヤ",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "pending",
+    "notes": "",
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T04:22:40Z",
+    "last_attempt_result": "error"
+  },
+  {
+    "uuid": "7426bf1b-d783-5ba1-bf03-cddef8643877",
+    "name": "AZKi",
+    "reading": "アズキ",
+    "source": "https://www.jvcmusic.co.jp/-/Profile/A028340.html",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Official Victor Entertainment profile clearly states 'AZKi (読み：アズキ)' indicating the reading is 'アズキ' (azuki). Multiple official sources confirm this reading including the Japanese Wikipedia page which states 'AZKi（あずき）'.",
+    "checked_at": "2026-09-07T04:23:04Z"
   }
 ]
