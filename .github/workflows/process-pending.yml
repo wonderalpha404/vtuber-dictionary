@@ -35,10 +35,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests
 
-      - name: Normalize legacy VTuber reading results
-        run: |
-          python scripts/normalize_vtuber_readings.py --mode legacy
-
       - name: Run batch processing
         id: run_batch
         run: |
