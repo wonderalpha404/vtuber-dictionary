@@ -177,7 +177,8 @@ Return exactly one valid JSON object and no prose. The object must contain exact
 }}
 
 Rules:
-- uuid and name must exactly match the target.
+- uuid must exactly match the target.
+- name should identify the target VTuber, but the returned name is not used as the canonical record name.
 - reading is the reliably established Japanese pronunciation; use "" if none can be established.
 - source must identify evidence supporting a non-empty reading.
 - source_type must be official, wikipedia, vtuber_database, media, other, or "".
@@ -203,9 +204,7 @@ def validate_result(data, uuid, name):
         raise ValueError(f"AI JSON missing required fields: {sorted(missing)}")
     if data["uuid"] != uuid:
         raise ValueError(f"UUID mismatch: expected={uuid!r} actual={data['uuid']!r}")
-    if data["name"] != name:
-        raise ValueError(f"name mismatch: expected={name!r} actual={data['name']!r}")
-    for field in ("reading", "source", "source_type", "confidence", "status", "notes"):
+    for field in ("name", "reading", "source", "source_type", "confidence", "status", "notes"):
         if not isinstance(data[field], str):
             raise ValueError(f"{field} must be a string")
     if data["status"] not in ALLOWED_STATUS:
@@ -308,7 +307,7 @@ def research(uuid, name):
             data = validate_result(extract_json_object(content), uuid, name)
             now = utc_now()
             result = {
-                "uuid": data["uuid"], "name": data["name"], "reading": data["reading"],
+                "uuid": uuid, "name": name, "reading": data["reading"],
                 "source": data["source"], "source_type": data["source_type"],
                 "confidence": data["confidence"], "status": data["status"], "notes": data["notes"],
                 "checked_at": now, "last_attempted_at": now, "last_attempt_result": "success",
