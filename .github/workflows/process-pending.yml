@@ -37,7 +37,7 @@ jobs:
 
       - name: Normalize legacy VTuber reading results
         run: |
-          python scripts/normalize_vtuber_readings.py
+          python scripts/normalize_vtuber_readings.py --mode legacy
 
       - name: Run batch processing
         id: run_batch
@@ -47,7 +47,7 @@ jobs:
       - name: Normalize VTuber reading results
         if: always()
         run: |
-          python scripts/normalize_vtuber_readings.py
+          python scripts/normalize_vtuber_readings.py --mode post
 
       - name: Show git status
         if: always()
