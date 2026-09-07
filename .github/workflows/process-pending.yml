@@ -35,10 +35,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests
 
+      - name: Normalize legacy VTuber reading results
+        run: |
+          python scripts/normalize_vtuber_readings.py
+
       - name: Run batch processing
         id: run_batch
         run: |
           python scripts/process_pending.py --count "$INPUT_COUNT"
+
+      - name: Normalize VTuber reading results
+        if: always()
+        run: |
+          python scripts/normalize_vtuber_readings.py
 
       - name: Show git status
         if: always()
