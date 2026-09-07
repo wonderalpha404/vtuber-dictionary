@@ -237,6 +237,45 @@ def select_records(eligible, mode):
     return eligible[:mode]
 
 
+def verify_research_result(uuid, name):
+    """
+    research_one_vtuber.py が exit code 0 で終了した場合でも、
+    実際の正常結果を確認する。
+    
+    Returns:
+        True: 正常結果を確認
+        False: 正常結果を確認できない
+    """
+    results = load_json(RESULT_PATH)
+    
+    if not isinstance(results, list):
+        return False
+    
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        
+        if result.get("uuid") != uuid:
+            continue
+        
+        if result.get("name") != name:
+            continue
+        
+        # UUID と name が一致した。以下をすべて確認する。
+        status = result.get("status")
+        last_attempt_result = result.get("last_attempt_result")
+        
+        if status not in {"verified", "review", "unknown"}:
+            return False
+        
+        if last_attempt_result != "success":
+            return False
+        
+        return True
+    
+    return False
+
+
 def run_research(record):
     uuid = get_uuid(record)
     name = get_name(record)
@@ -255,6 +294,7 @@ def run_research(record):
                 sys.executable,
                 str(RESEARCH_SCRIPT),
                 uuid,
+                name,
             ],
             text=True,
             capture_output=True,
@@ -273,28 +313,49 @@ def run_research(record):
     stderr = completed.stderr.strip()
 
     if completed.returncode == 0:
-        print("RESULT: SUCCESS")
-        print(f"name={name}")
-        print(f"uuid={uuid}")
+        # exit code 0 でも、実際の正常結果を確認する
+        if verify_research_result(uuid, name):
+            print("RESULT: SUCCESS")
+            print(f"name={name}")
+            print(f"uuid={uuid}")
 
-        if stdout:
-            print("research output:")
-            print(stdout)
+            if stdout:
+                print("research output:")
+                print(stdout)
 
-        if stderr:
-            print("research stderr:")
-            print(stderr)
+            if stderr:
+                print("research stderr:")
+                print(stderr)
 
-        print(f"started_at={started_at}")
-        print(f"finished_at={utc_now()}")
+            print(f"started_at={started_at}")
+            print(f"finished_at={utc_now()}")
 
-        return True
+            return True
+        else:
+            # exit code 0 だが正常結果がない
+            print("RESULT: FAILED")
+            print(f"name={name}")
+            print(f"uuid={uuid}")
+            print(f"exit_code={completed.returncode}")
+            print("reason=research exited 0 but no valid saved result was found")
+            print(f"started_at={started_at}")
+            print(f"finished_at={utc_now()}")
+
+            if stdout:
+                print("stdout:")
+                print(stdout)
+
+            if stderr:
+                print("stderr:")
+                print(stderr)
+
+            return False
 
     print("RESULT: FAILED")
     print(f"name={name}")
     print(f"uuid={uuid}")
     print(f"exit_code={completed.returncode}")
-    print("reason=research script exit code 1")
+    print(f"reason=research script exit code {completed.returncode}")
     print(f"started_at={started_at}")
     print(f"finished_at={utc_now()}")
 
