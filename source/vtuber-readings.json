@@ -159,5 +159,123 @@
     "checked_at": "",
     "last_attempted_at": "2026-09-07T04:28:43Z",
     "last_attempt_result": "error"
+  },
+  {
+    "uuid": "a7b099af-078e-5daf-bc51-ed14544352f4",
+    "name": "Eve SCP",
+    "reading": "",
+    "source": "https://twpf.jp/Eve_scp; https://virtualyoutuber.userlocal.jp/user/FDE5E0011D5C0CA7_d55e40; https://www.moguravr.com/scp-vtuber-eve/; https://virtualyoutuber.fandom.com/wiki/Eve",
+    "source_type": "third_party",
+    "confidence": "unknown",
+    "status": "unknown",
+    "notes": "No reliable evidence establishes a specific Japanese reading (e.g., イヴ/イブ) for Eve SCP. The official Twitter handle (@Eve_scp), YouTube channel, upd8 listing, MoguLive article, Virtual YouTuber Wiki, and the VTuber's own self-introduction all refer to her only as 'Eve' or 'SCP-Eve' in Latin letters, with no kana or furigana indicating pronunciation. Wikipedia (Japanese) does not have an article for this VTuber. The name is an English proper noun (Eve) and the VTuber is referenced consistently by the Romanized form; no Japanese phonetic reading could be verified from any official or reliable third-party source.",
+    "checked_at": "2026-09-07T04:39:53Z"
+  },
+  {
+    "uuid": "581b81c4-91be-5591-8f9f-8d22c2012a3e",
+    "name": "はち",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "pending",
+    "notes": "",
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T04:40:17Z",
+    "last_attempt_result": "error"
+  },
+  {
+    "uuid": "949fb22b-6aec-5014-a445-cf24d2ae32ca",
+    "name": "Haruru_Official",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "unknown",
+    "notes": "No reliable evidence found for this VTuber. Extensive searches across official sources, VTuber databases, and third-party references did not return any results matching the exact name Haruru_Official with UUID 949fb22b-6aec-5014-a445-cf24d2ae32ca. Multiple VTubers with similar names exist (HaruRuu, 天晴Haruru, はるる, etc.) but none matched the exact identifier provided.",
+    "checked_at": "2026-09-07T04:40:56Z"
+  },
+  {
+    "uuid": "85965429-96ed-5f25-9f58-185f67538c5e",
+    "name": "Jinlly多宇Official",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "unknown",
+    "notes": "No reliable source found establishing a Japanese reading for the name Jinlly多宇Official. The VTuber appears to be a Chinese (Bilibili) VTuber with the romanized given name 'Jinlly' and the character 多宇, but no official or established third-party source provides a Japanese pronunciation of the name. The name is written in Chinese characters and the 'Official' portion is English, so a distinct Japanese reading is not established.",
+    "checked_at": "2026-09-07T04:41:10Z"
+  },
+  {
+    "uuid": "4a40ea6a-a854-5ba4-aa64-6e3388f3b7b9",
+    "name": "こつき",
+    "reading": "こつき",
+    "source": "https://buhitter.com/author/HYkotsuki",
+    "source_type": "third_party_profile_aggregator",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "The VTuber's own Twitter account (@HYkotsuki) self-identifies in Japanese as こつき, with the English romanization 'Kotsuki' and the Chinese name 昊月. The name is written in hiragana in Japanese, and the reading 'kotsuki' is directly established by the VTuber's own self-introduction ('中国人のこつきです') and the consistent romanization 'Kotsuki'/'Kotuski' used in their profile.",
+    "checked_at": "2026-09-07T04:41:40Z"
+  },
+  {
+    "uuid": "720f517a-d6d8-5fde-8227-9fd98664c588",
+    "name": "カナタヒカリ",
+    "reading": "カナタヒカリ",
+    "source": "https://ci-en.net/creator/197, https://virtual-youtuber.userlocal.jp/user/F155F2C6E67F4A48_c9896e, https://camp-fire.jp/projects/187475/view",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Multiple official sources confirm the reading. The VTuber introduces themselves as 'カナタヒカリと申します' (I am Kanata Hikari) on their official Ci-en profile, YouTube channel description, and Campfire crowdfunding page. The name is written in hiragana/katakana, which directly shows the phonetic reading as 'カナタヒカリ'.",
+    "checked_at": "2026-09-07T04:42:14Z"
+  },
+  {
+    "uuid": "b3ba25af-7413-53c4-b658-ed0c47d1c4f6",
+    "name": "Liberate Anime Studio",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "pending",
+    "notes": "",
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T04:42:36Z",
+    "last_attempt_result": "error"
+  },
+  {
+    "uuid": "7a4cd326-16d2-51ad-a95b-5d2061b0ed18",
+    "name": "MEM project",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "pending",
+    "notes": "",
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T04:42:52Z",
+    "last_attempt_result": "error"
+  },
+  {
+    "uuid": "19e4ef43-6a9d-5ff5-b79b-d59e8c98d19e",
+    "name": "米プリンセス",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "unknown",
+    "notes": "No reliable evidence found establishing the actual Japanese reading of the name 米プリンセス for this specific VTuber (UUID 19e4ef43-6a9d-5ff5-b79b-d59e8c98d19e). The name contains the loanword プリンセス and the kanji 米, which could be read as こめ, よね, まい, べい, etc., but none can be confirmed without an official source. The VDB entry shows the default romanization as 'MaiPrincess', but this alone does not establish the Japanese reading.",
+    "checked_at": "2026-09-07T04:42:54Z"
+  },
+  {
+    "uuid": "d63b7efc-26e9-5aa7-b905-d31450074f52",
+    "name": "ミシェもついに",
+    "reading": "",
+    "source": "",
+    "source_type": "",
+    "confidence": "unknown",
+    "status": "pending",
+    "notes": "",
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T04:43:08Z",
+    "last_attempt_result": "error"
   }
 ]
