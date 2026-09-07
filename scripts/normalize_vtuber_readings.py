@@ -1,27 +1,38 @@
 #!/usr/bin/env python3
 """Normalize vtuber-readings.json to the current result schema."""
 
+import argparse
 import json
 from pathlib import Path
 
 RESULT_PATH = Path("source/vtuber-readings.json")
 
 
-def normalize_record(record):
+def normalize_record(record, mode):
     if not isinstance(record, dict):
         return False
 
     changed = False
 
-    # Legacy status="unknown" means "researched but no reliable reading".
-    # The current schema represents that as pending + confidence=unknown.
-    if record.get("status") == "unknown":
+    if mode == "legacy" and record.get("status") == "unknown":
+        # Existing legacy records are reset and scheduled for fresh research.
         record["status"] = "pending"
         record["reading"] = ""
         record["source"] = ""
         record["source_type"] = ""
         record["confidence"] = ""
         record["last_attempt_result"] = ""
+        changed = True
+
+    elif mode == "post" and record.get("status") == "unknown":
+        # research_one_vtuber.py may still emit the legacy status value during
+        # the transition. A newly completed research with no reliable reading
+        # becomes pending + confidence=unknown.
+        record["status"] = "pending"
+        record["reading"] = ""
+        record["source"] = ""
+        record["source_type"] = ""
+        record["confidence"] = "unknown"
         changed = True
 
     # confidence is an AI-review-only field. Deterministic kana results do not
@@ -57,6 +68,15 @@ def normalize_record(record):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        choices=("legacy", "post"),
+        required=True,
+        help="legacy resets existing status=unknown records; post converts newly produced legacy unknown results.",
+    )
+    args = parser.parse_args()
+
     if not RESULT_PATH.exists():
         print(f"No result file: {RESULT_PATH}")
         return 0
@@ -70,7 +90,7 @@ def main():
     changed_count = 0
 
     for record in results:
-        if normalize_record(record):
+        if normalize_record(record, args.mode):
             changed_count += 1
 
     if changed_count:
@@ -80,7 +100,7 @@ def main():
             f.write("\n")
         temp_path.replace(RESULT_PATH)
 
-    print(f"Normalized records: {changed_count}")
+    print(f"Normalized records ({args.mode}): {changed_count}")
     return 0
 
 
