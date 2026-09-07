@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       count:
-        description: "処理する件数（正の整数）"
+        description: "処理する件数（正の整数、または r でランダム3件）"
         required: true
         default: "10"
 
@@ -14,9 +14,11 @@ permissions:
 jobs:
   process:
     runs-on: ubuntu-latest
+
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       INPUT_COUNT: ${{ inputs.count }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +31,9 @@ jobs:
           python-version: "3.10"
 
       - name: Install requests
-        run: python -m pip install --upgrade pip && python -m pip install requests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests
 
       - name: Run batch processing
         id: run_batch
@@ -37,21 +41,28 @@ jobs:
           python scripts/process_pending.py --count "$INPUT_COUNT"
 
       - name: Show git status
+        if: always()
         run: |
           echo "Git status (porcelain):"
           git status --porcelain
+
           echo "Diff name-only:"
           git --no-pager diff --name-only || true
 
       - name: Commit and push changes if vtuber-readings.json changed
+        if: always()
         run: |
           CHANGED_FILES=$(git status --porcelain | cut -c4- | sed '/^$/d' | tr '\n' ' ')
+
           if [ -z "$CHANGED_FILES" ]; then
             echo "No changes to commit."
             exit 0
           fi
+
           echo "Changed files: $CHANGED_FILES"
+
           ALLOWED="source/vtuber-readings.json"
+
           for f in $CHANGED_FILES; do
             if [ "$f" != "$ALLOWED" ]; then
               echo "Aborting push: unexpected modified file: $f"
@@ -59,8 +70,14 @@ jobs:
               exit 1
             fi
           done
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add source/vtuber-readings.json
-          git commit -m "Update vtuber readings: batch processed up to ${{ inputs.count }} items" || echo "Nothing to commit"
+
+          git commit \
+            -m "Update vtuber readings: batch processed up to ${{ inputs.count }}" \
+            || echo "Nothing to commit"
+
           git push
