@@ -241,38 +241,37 @@ def verify_research_result(uuid, name):
     """
     research_one_vtuber.py が exit code 0 で終了した場合でも、
     実際の正常結果を確認する。
-    
+
     Returns:
         True: 正常結果を確認
         False: 正常結果を確認できない
     """
     results = load_json(RESULT_PATH)
-    
+
     if not isinstance(results, list):
         return False
-    
+
     for result in results:
         if not isinstance(result, dict):
             continue
-        
+
         if result.get("uuid") != uuid:
             continue
-        
+
         if result.get("name") != name:
             continue
-        
-        # UUID と name が一致した。以下をすべて確認する。
+
         status = result.get("status")
         last_attempt_result = result.get("last_attempt_result")
-        
+
         if status not in {"verified", "review", "unknown"}:
             return False
-        
+
         if last_attempt_result != "success":
             return False
-        
+
         return True
-    
+
     return False
 
 
@@ -304,7 +303,7 @@ def run_research(record):
         print(f"name={name}")
         print(f"uuid={uuid}")
         print("exit_code=process_start_error")
-        print(f"reason={exc}")
+        print(f"reason={type(exc).__name__}: {exc}")
         print(f"started_at={started_at}")
         print(f"finished_at={utc_now()}")
         return False
@@ -313,7 +312,6 @@ def run_research(record):
     stderr = completed.stderr.strip()
 
     if completed.returncode == 0:
-        # exit code 0 でも、実際の正常結果を確認する
         if verify_research_result(uuid, name):
             print("RESULT: SUCCESS")
             print(f"name={name}")
@@ -331,31 +329,36 @@ def run_research(record):
             print(f"finished_at={utc_now()}")
 
             return True
-        else:
-            # exit code 0 だが正常結果がない
-            print("RESULT: FAILED")
-            print(f"name={name}")
-            print(f"uuid={uuid}")
-            print(f"exit_code={completed.returncode}")
-            print("reason=research exited 0 but no valid saved result was found")
-            print(f"started_at={started_at}")
-            print(f"finished_at={utc_now()}")
 
-            if stdout:
-                print("stdout:")
-                print(stdout)
+        print("RESULT: FAILED")
+        print(f"name={name}")
+        print(f"uuid={uuid}")
+        print(f"exit_code={completed.returncode}")
+        print(
+            "reason=research exited 0 but "
+            "no valid saved result was found"
+        )
+        print(f"started_at={started_at}")
+        print(f"finished_at={utc_now()}")
 
-            if stderr:
-                print("stderr:")
-                print(stderr)
+        if stdout:
+            print("stdout:")
+            print(stdout)
 
-            return False
+        if stderr:
+            print("stderr:")
+            print(stderr)
+
+        return False
 
     print("RESULT: FAILED")
     print(f"name={name}")
     print(f"uuid={uuid}")
     print(f"exit_code={completed.returncode}")
-    print(f"reason=research script exit code {completed.returncode}")
+    print(
+        f"reason=research script exit code "
+        f"{completed.returncode}"
+    )
     print(f"started_at={started_at}")
     print(f"finished_at={utc_now()}")
 
@@ -410,7 +413,8 @@ def main():
 
     if not isinstance(vdb_records, list):
         print(
-            "ERROR: source/vdb.json does not contain a valid 'vtbs' array.",
+            "ERROR: source/vdb.json does not contain a valid "
+            "'vtbs' array.",
             file=sys.stderr,
         )
         return 1
@@ -537,10 +541,6 @@ def main():
 
     result_by_uuid = build_result_index(results)
 
-    # Recalculate eligible records.
-    #
-    # This is important because research_one_vtuber.py may have
-    # changed the result file during this run.
     remaining_eligible = [
         record
         for record in japanese_targets
