@@ -1,0 +1,82 @@
+name: Reprocess single VTuber
+
+on:
+  workflow_dispatch:
+    inputs:
+      uuid:
+        description: "ターゲットの UUID（優先）"
+        required: false
+        default: ""
+      name:
+        description: "UUID がなければ name（正確一致）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  reprocess:
+    runs-on: ubuntu-latest
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      INPUT_UUID: ${{ inputs.uuid }}
+      INPUT_NAME: ${{ inputs.name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install requests
+        run: python -m pip install --upgrade pip && python -m pip install requests
+
+      - name: Run reprocess for single record
+        run: |
+          # Use environment variables to pass inputs safely
+          UUID="$INPUT_UUID"
+          NAME="$INPUT_NAME"
+          if [ -n "$UUID" ]; then
+            echo "Reprocessing by UUID"
+            python scripts/reprocess_single.py --uuid "$UUID"
+          elif [ -n "$NAME" ]; then
+            echo "Reprocessing by name"
+            python scripts/reprocess_single.py --name "$NAME"
+          else
+            echo "Either uuid or name must be provided" >&2
+            exit 1
+          fi
+
+      - name: Show git status
+        run: |
+          echo "Git status (porcelain):"
+          git status --porcelain
+          echo "Diff name-only:"
+          git --no-pager diff --name-only || true
+
+      - name: Commit and push changes if only sample file changed
+        run: |
+          CHANGED_FILES=$(git status --porcelain | cut -c4- | sed '/^$/d' | tr '\n' ' ')
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          echo "Changed files: $CHANGED_FILES"
+          ALLOWED="source/sample-10-jp.json"
+          for f in $CHANGED_FILES; do
+            if [ "$f" != "$ALLOWED" ]; then
+              echo "Aborting push: unexpected modified file: $f"
+              echo "Only $ALLOWED may be changed by this workflow."
+              exit 1
+            fi
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add source/sample-10-jp.json
+          git commit -m "Reprocess single vtuber via workflow" || echo "Nothing to commit"
+          git push
