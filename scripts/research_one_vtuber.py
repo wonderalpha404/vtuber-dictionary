@@ -10,394 +10,38 @@ from datetime import datetime, timezone
 import requests
 
 
-VDB_PATH = "source/vdb.json"
-RESULT_PATH = "source/vtuber-readings.json"
-
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "openrouter/free"
 
 CONNECT_TIMEOUT = 15
 READ_TIMEOUT = 60
 
+OUTPUT_FILE = "source/vtuber-readings.json"
+
+ALLOWED_STATUS = {"verified", "review", "unknown"}
+ALLOWED_CONFIDENCE = {"high", "medium", "review", "unknown"}
+ALLOWED_SOURCE_TYPES = {
+    "official",
+    "wikipedia",
+    "vtuber_database",
+    "media",
+    "other",
+    "",
+}
+
 
 def utc_now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_json(path, data):
-    temp_path = path + ".tmp"
-
-    with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.write("\n")
-
-    os.replace(temp_path, path)
-
-
-def find_vtuber(vdb, uuid):
-    for record in vdb.get("vtbs", []):
-        if record.get("uuid") == uuid:
-            return record
-
-    return None
-
-
-def get_japanese_name(record):
-    name = record.get("name", {})
-
-    if not isinstance(name, dict):
-        return ""
-
-    jp = name.get("jp")
-
-    if not isinstance(jp, str):
-        return ""
-
-    return jp.strip()
-
-
-def build_research_prompt(record):
-    uuid = record.get("uuid", "")
-    name = get_japanese_name(record)
-
-    return f"""
-あなたはVTuberデータベースの調査担当です。
-
-以下のVTuberについて、日本語表記の正式な読み方を調査してください。
-
-UUID:
-{uuid}
-
-名前:
-{name}
-
-目的:
-VTuber名を日本語IME辞書に登録するため、名前の正確な読み方を取得します。
-
-【最重要ルール】
-
-1. 最終回答は必ずJSONオブジェクト1個だけにしてください。
-2. JSON以外の文章を絶対に出力しないでください。
-3. Markdownのコードブロックも使用しないでください。
-4. 調査途中の説明、検索状況、推論、コメントなどを出力しないでください。
-5. 読み方を確定できない場合でも、必ずJSONを返してください。
-6. 読み方を推測してはいけません。
-7. 漢字から一般的に推測できる読みだけを根拠にしてはいけません。
-8. 検索結果に似た名前の別VTuberが出た場合、それを対象VTuberとして扱ってはいけません。
-9. 名前とUUIDが一致する対象を優先してください。
-10. 無限に検索を続けないでください。十分な証拠が得られなければunknownとして終了してください。
-
-【調査優先順位】
-
-第1優先:
-- VTuber本人の公式プロフィール
-- 公式サイト
-- 公式SNS
-- 公式YouTube等のプロフィール
-- 所属事務所・公式運営ページ
-
-第2優先:
-- Wikipedia
-- 信頼できるVTuberデータベース
-- 日本語の信頼できるメディア・人物情報サイト
-
-第3優先:
-- 上記で不足する場合のみ、名前を完全一致させた追加検索
-
-Wikipediaは第三者情報源として利用できます。
-ただしWikipediaだけで確認できた場合、通常はconfidenceをmediumとしてください。
-
-【別人判定】
-
-名前が似ているだけの人物・VTuberは絶対に同一人物として扱わないでください。
-
-特に、
-{name}
-と表記が少しでも異なる人物が検索結果に出た場合、
-その人物の読みを今回の対象の読みとして採用しないでください。
-
-【JSON形式】
-
-必ず以下の形式だけを返してください。
-
-{{
-  "uuid": "{uuid}",
-  "name": "{name}",
-  "reading": "",
-  "status": "unknown",
-  "confidence": "unknown",
-  "source": "",
-  "source_type": "",
-  "notes": ""
-}}
-
-【status】
-
-verified:
-信頼できる情報源によって読み方を確認できた場合。
-
-review:
-候補となる読みはあるが、十分な確証がない場合。
-
-unknown:
-信頼できる読みを確認できなかった場合。
-
-【confidence】
-
-high:
-公式情報など非常に強い根拠がある。
-
-medium:
-Wikipedia、信頼できるVTuberデータベース、複数の第三者情報源などで確認できる。
-
-review:
-根拠が弱い、または情報源間に不一致がある。
-
-unknown:
-読みを確認できない。
-
-【reading】
-
-確認できた正式な日本語読みをひらがなで記入してください。
-
-確認できない場合は空文字列にしてください。
-
-絶対に推測で埋めないでください。
-
-【source】
-
-読み方を確認したURLを1つ以上記載してください。
-
-確認できない場合は空文字列にしてください。
-
-【source_type】
-
-例えば以下を使用してください。
-
-official
-wikipedia
-vtuber_database
-media
-other
-
-確認できない場合は空文字列にしてください。
-
-【notes】
-
-必要な場合だけ簡潔に記載してください。
-
-ただし、長い調査記録や検索ログは書かないでください。
-
-最終出力はJSONオブジェクト1個だけです。
-""".strip()
-
-
-def extract_json_object(text):
-    """
-    AIがJSON以外の文字を少量含めた場合に備え、
-    JSONオブジェクト部分だけを抽出する。
-
-    ただし、自然言語の調査文章しか返っていない場合は
-    JSONとして扱わず失敗にする。
-    """
-
-    text = text.strip()
-
-    # 完全なJSON
-    try:
-        parsed = json.loads(text)
-
-        if isinstance(parsed, dict):
-            return parsed
-
-    except json.JSONDecodeError:
-        pass
-
-    # ```json ... ``` の場合
-    fenced = re.search(
-        r"```(?:json)?\s*(\{.*\})\s*```",
-        text,
-        re.DOTALL,
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
     )
 
-    if fenced:
-        try:
-            parsed = json.loads(fenced.group(1))
 
-            if isinstance(parsed, dict):
-                return parsed
-
-        except json.JSONDecodeError:
-            pass
-
-    # 最初の { から最後の } まで
-    start = text.find("{")
-    end = text.rfind("}")
-
-    if start >= 0 and end > start:
-        candidate = text[start:end + 1]
-
-        try:
-            parsed = json.loads(candidate)
-
-            if isinstance(parsed, dict):
-                return parsed
-
-        except json.JSONDecodeError:
-            pass
-
-    return None
+def log(message):
+    print(message, file=sys.stderr, flush=True)
 
 
-def validate_result(result, expected_uuid, expected_name):
-    if not isinstance(result, dict):
-        raise ValueError("AI response is not a JSON object")
-
-    required_fields = [
-        "uuid",
-        "name",
-        "reading",
-        "status",
-        "confidence",
-        "source",
-        "source_type",
-        "notes",
-    ]
-
-    missing = [
-        field
-        for field in required_fields
-        if field not in result
-    ]
-
-    if missing:
-        raise ValueError(
-            "Missing required fields: " + ", ".join(missing)
-        )
-
-    if result["uuid"] != expected_uuid:
-        raise ValueError(
-            f"UUID mismatch: expected={expected_uuid} "
-            f"actual={result['uuid']}"
-        )
-
-    if result["name"] != expected_name:
-        raise ValueError(
-            f"name mismatch: expected={expected_name} "
-            f"actual={result['name']}"
-        )
-
-    allowed_statuses = {
-        "verified",
-        "review",
-        "unknown",
-    }
-
-    if result["status"] not in allowed_statuses:
-        raise ValueError(
-            f"Invalid status: {result['status']}"
-        )
-
-    allowed_confidence = {
-        "high",
-        "medium",
-        "review",
-        "unknown",
-    }
-
-    if result["confidence"] not in allowed_confidence:
-        raise ValueError(
-            f"Invalid confidence: {result['confidence']}"
-        )
-
-    reading = result["reading"]
-
-    if not isinstance(reading, str):
-        raise ValueError("reading must be a string")
-
-    if result["status"] == "verified" and not reading.strip():
-        raise ValueError(
-            "verified result must have a non-empty reading"
-        )
-
-    if result["status"] == "unknown" and reading.strip():
-        raise ValueError(
-            "unknown result must have an empty reading"
-        )
-
-    return result
-
-
-def save_success_result(result):
-    results = load_json(RESULT_PATH)
-
-    if not isinstance(results, list):
-        raise ValueError(
-            f"{RESULT_PATH} must contain a JSON array"
-        )
-
-    uuid = result["uuid"]
-
-    existing_index = None
-
-    for index, item in enumerate(results):
-        if isinstance(item, dict) and item.get("uuid") == uuid:
-            existing_index = index
-            break
-
-    result_to_save = {
-        "uuid": result["uuid"],
-        "name": result["name"],
-        "reading": result["reading"],
-        "source": result["source"],
-        "source_type": result["source_type"],
-        "confidence": result["confidence"],
-        "status": result["status"],
-        "notes": result["notes"],
-        "checked_at": utc_now(),
-    }
-
-    if existing_index is None:
-        results.append(result_to_save)
-    else:
-        existing = results[existing_index]
-
-        # 既存の成功データを守る。
-        # 新しい成功結果だけを更新する。
-        if existing.get("status") in {
-            "verified",
-            "review",
-            "unknown",
-        }:
-            results[existing_index] = result_to_save
-        else:
-            results[existing_index] = result_to_save
-
-    save_json(RESULT_PATH, results)
-
-
-def save_failure_state(uuid, name):
-    """
-    詳細なエラー内容は保存しない。
-
-    保存するのは「失敗した」という状態だけ。
-    """
-
-    results = load_json(RESULT_PATH)
-
-    if not isinstance(results, list):
-        raise ValueError(
-            f"{RESULT_PATH} must contain a JSON array"
-        )
-
-    attempted_at = utc_now()
-
-    failure_state = {
+def make_failure_record(uuid, name, started_at):
+    return {
         "uuid": uuid,
         "name": name,
         "reading": "",
@@ -407,59 +51,413 @@ def save_failure_state(uuid, name):
         "status": "pending",
         "notes": "",
         "checked_at": "",
-        "last_attempted_at": attempted_at,
+        "last_attempted_at": started_at,
         "last_attempt_result": "error",
     }
 
-    existing_index = None
 
-    for index, item in enumerate(results):
-        if isinstance(item, dict) and item.get("uuid") == uuid:
-            existing_index = index
-            break
+def load_results():
+    if not os.path.exists(OUTPUT_FILE):
+        return []
 
-    if existing_index is None:
-        results.append(failure_state)
-    else:
-        existing = results[existing_index]
+    with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-        # 既存の成功結果を失敗で壊さない。
-        if existing.get("status") in {
-            "verified",
-            "review",
-            "unknown",
-        }:
-            print(
-                f"FAILURE STATE NOT OVERWRITTEN "
-                f"name={name} uuid={uuid}",
-                file=sys.stderr,
-            )
-        else:
-            results[existing_index] = failure_state
+    if not isinstance(data, list):
+        raise ValueError(f"{OUTPUT_FILE} must contain a JSON array")
 
-    save_json(RESULT_PATH, results)
+    return data
 
-    print(
-        f"FAILURE STATE SAVED "
-        f"name={name} uuid={uuid} "
-        f"status=pending "
-        f"last_attempt_result=error",
-        file=sys.stderr,
+
+def save_results(results):
+    temp_file = OUTPUT_FILE + ".tmp"
+
+    with open(temp_file, "w", encoding="utf-8") as f:
+        json.dump(
+            results,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+        f.write("\n")
+
+    os.replace(temp_file, OUTPUT_FILE)
+
+
+def upsert_result(record):
+    results = load_results()
+
+    uuid = record["uuid"]
+
+    for i, existing in enumerate(results):
+        if existing.get("uuid") == uuid:
+            results[i] = record
+            save_results(results)
+            return
+
+    results.append(record)
+    save_results(results)
+
+
+def extract_json_object(text):
+    """
+    Extract a JSON object from the AI response.
+
+    Accepts:
+    - pure JSON
+    - JSON inside a Markdown code fence
+    - JSON surrounded by accidental prose
+
+    Does NOT invent or repair missing JSON.
+    """
+
+    if not isinstance(text, str):
+        raise ValueError("AI response content is not a string")
+
+    text = text.strip()
+
+    if not text:
+        raise ValueError("AI response content is empty")
+
+    # First: try the complete response directly.
+    try:
+        parsed = json.loads(text)
+
+        if isinstance(parsed, dict):
+            return parsed
+
+        raise ValueError("AI response JSON is not an object")
+
+    except json.JSONDecodeError:
+        pass
+
+    # Second: remove Markdown code fences.
+    fenced = re.search(
+        r"```(?:json)?\s*(\{.*?\})\s*```",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
     )
 
+    if fenced:
+        candidate = fenced.group(1)
 
-def call_openrouter(prompt, uuid, name):
+        try:
+            parsed = json.loads(candidate)
+
+            if isinstance(parsed, dict):
+                return parsed
+
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"JSON code fence found but JSON is invalid: {exc}"
+            ) from exc
+
+    # Third: find the first balanced JSON object.
+    start = text.find("{")
+
+    if start >= 0:
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for i in range(start, len(text)):
+            char = text[i]
+
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+                continue
+
+            if char == "{":
+                depth += 1
+
+            elif char == "}":
+                depth -= 1
+
+                if depth == 0:
+                    candidate = text[start : i + 1]
+
+                    try:
+                        parsed = json.loads(candidate)
+
+                        if isinstance(parsed, dict):
+                            return parsed
+
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(
+                            f"Embedded JSON object is invalid: {exc}"
+                        ) from exc
+
+        raise ValueError("Could not find a complete valid JSON object")
+
+    raise ValueError("No JSON object found in AI response")
+
+
+def build_prompt(uuid, name):
+    return f"""
+You are researching the VTuber record below.
+
+TARGET
+name: {name}
+uuid: {uuid}
+
+Your task is to determine the actual Japanese pronunciation/reading of this exact VTuber name.
+
+IMPORTANT IDENTITY RULES
+- The UUID is the stable identity key.
+- Do not confuse similarly named VTubers.
+- Do not confuse a VTuber with another person, character, organization, or unrelated account.
+- Do not infer a reading merely from kanji.
+- Do not guess.
+- The source must support the reading for this exact VTuber.
+- Search the web when necessary.
+- Prefer official sources first.
+- Wikipedia is an acceptable high-quality secondary source.
+- Established VTuber databases are acceptable secondary sources.
+- Established Japanese media/reference sites are acceptable secondary sources.
+- Do not rely on search-result snippets alone.
+- Do not rely on a source merely because the name looks similar.
+- Stop searching once sufficient reliable evidence has been obtained.
+- Do not perform unlimited or unnecessary searches.
+
+SOURCE PRIORITY
+1. Official VTuber / agency / creator source
+2. Wikipedia
+3. Established VTuber database
+4. Established Japanese media or reference source
+5. Other identifiable source
+
+CRITICAL OUTPUT RULE
+
+You MUST return exactly ONE valid JSON object as your final answer.
+
+DO NOT return:
+- investigation notes
+- explanations
+- progress messages
+- "I found..."
+- "Let me search..."
+- "I will check..."
+- "I have gathered..."
+- "I need to search..."
+- Markdown
+- code fences
+- prose before the JSON
+- prose after the JSON
+- partial results
+- search progress
+
+Web searching and reasoning are internal steps.
+
+The ONLY text in your final response must be the JSON object.
+
+The JSON object MUST contain exactly these fields:
+
+{{
+  "uuid": "{uuid}",
+  "name": "{name}",
+  "reading": "",
+  "source": "",
+  "source_type": "",
+  "confidence": "unknown",
+  "status": "unknown",
+  "notes": ""
+}}
+
+FIELD RULES
+
+- uuid:
+  Must be exactly "{uuid}".
+
+- name:
+  Must be exactly "{name}".
+
+- reading:
+  The actual Japanese pronunciation if reliably established.
+  If no reliable reading can be established, use "".
+  Never guess.
+
+- source:
+  A URL or concise source identification supporting the reading.
+  If no reliable source exists, use "".
+
+- source_type:
+  Must be one of:
+  "official"
+  "wikipedia"
+  "vtuber_database"
+  "media"
+  "other"
+  ""
+
+- confidence:
+  Must be one of:
+  "high"
+  "medium"
+  "review"
+  "unknown"
+
+- status:
+  Must be one of:
+  "verified"
+  "review"
+  "unknown"
+
+- notes:
+  Short factual note only.
+  Do not include research logs.
+  Do not include long explanations.
+  If there is no useful note, use "".
+
+STATUS RULES
+
+- verified:
+  Reliable evidence establishes the reading.
+
+- review:
+  A plausible candidate exists, but evidence is insufficient, weak, or conflicting.
+
+- unknown:
+  No reliable reading can be established.
+
+Never invent a reading merely to avoid returning "unknown".
+
+CONFIDENCE RULES
+
+- high:
+  Strong direct evidence, preferably from an official source or multiple reliable sources.
+
+- medium:
+  Reliable secondary evidence, including Wikipedia or an established VTuber database.
+
+- review:
+  Weak, conflicting, or incomplete evidence.
+
+- unknown:
+  No reliable evidence for a reading.
+
+IMPORTANT
+
+If Wikipedia provides a reliable reading but there is no official confirmation,
+it may support "medium" confidence.
+
+If an established VTuber database provides a reliable reading,
+it may support "medium" confidence.
+
+Do not automatically assign "high" merely because a source exists.
+
+FINAL VALIDATION BEFORE ANSWERING
+
+Before producing the final answer:
+
+1. Confirm the identity matches the exact target name.
+2. Confirm the identity matches the exact UUID when the source provides UUID information.
+3. Confirm the reading is supported by evidence.
+4. Confirm the JSON is syntactically valid.
+5. Confirm every required field exists.
+6. Confirm all enum values are valid.
+7. Confirm uuid is exactly "{uuid}".
+8. Confirm name is exactly "{name}".
+9. Confirm there is absolutely no prose outside the JSON object.
+
+If reliable evidence cannot be established, return a valid JSON object with:
+- reading = ""
+- confidence = "unknown"
+- status = "unknown"
+
+Do not explain the failure outside the JSON.
+
+Return ONLY the JSON object.
+""".strip()
+
+
+def validate_result(data, uuid, name):
+    if not isinstance(data, dict):
+        raise ValueError("AI response is not a JSON object")
+
+    required_fields = {
+        "uuid",
+        "name",
+        "reading",
+        "source",
+        "source_type",
+        "confidence",
+        "status",
+        "notes",
+    }
+
+    missing = required_fields - set(data.keys())
+
+    if missing:
+        raise ValueError(
+            f"AI JSON missing required fields: {sorted(missing)}"
+        )
+
+    if data["uuid"] != uuid:
+        raise ValueError(
+            f"UUID mismatch: expected={uuid!r} actual={data['uuid']!r}"
+        )
+
+    if data["name"] != name:
+        raise ValueError(
+            f"name mismatch: expected={name!r} actual={data['name']!r}"
+        )
+
+    if not isinstance(data["reading"], str):
+        raise ValueError("reading must be a string")
+
+    if not isinstance(data["source"], str):
+        raise ValueError("source must be a string")
+
+    if not isinstance(data["source_type"], str):
+        raise ValueError("source_type must be a string")
+
+    if not isinstance(data["confidence"], str):
+        raise ValueError("confidence must be a string")
+
+    if not isinstance(data["status"], str):
+        raise ValueError("status must be a string")
+
+    if not isinstance(data["notes"], str):
+        raise ValueError("notes must be a string")
+
+    if data["status"] not in ALLOWED_STATUS:
+        raise ValueError(
+            f"Invalid status: {data['status']!r}"
+        )
+
+    if data["confidence"] not in ALLOWED_CONFIDENCE:
+        raise ValueError(
+            f"Invalid confidence: {data['confidence']!r}"
+        )
+
+    if data["source_type"] not in ALLOWED_SOURCE_TYPES:
+        raise ValueError(
+            f"Invalid source_type: {data['source_type']!r}"
+        )
+
+    # If a reading exists, it should normally have supporting evidence.
+    if data["reading"] and not data["source"]:
+        raise ValueError(
+            "AI returned a reading without a supporting source"
+        )
+
+    return data
+
+
+def request_openrouter(uuid, name, prompt):
     api_key = os.environ.get("OPENROUTER_API_KEY")
 
     if not api_key:
-        raise RuntimeError(
-            "OPENROUTER_API_KEY is not set"
-        )
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+        raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     payload = {
         "model": OPENROUTER_MODEL,
@@ -479,35 +477,23 @@ def call_openrouter(prompt, uuid, name):
         ],
     }
 
-    print(
-        "OPENROUTER REQUEST",
-        file=sys.stderr,
-    )
-    print(
-        f"name={name}",
-        file=sys.stderr,
-    )
-    print(
-        f"uuid={uuid}",
-        file=sys.stderr,
-    )
-    print(
-        f"model={OPENROUTER_MODEL}",
-        file=sys.stderr,
-    )
-    print(
-        "web_search=true",
-        file=sys.stderr,
-    )
-    print(
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/wonderalpha404/vtuber-dictionary",
+        "X-Title": "VTuber Dictionary Reading Research",
+    }
+
+    log("OPENROUTER REQUEST")
+    log(f"name={name}")
+    log(f"uuid={uuid}")
+    log(f"model={OPENROUTER_MODEL}")
+    log("web_search=true")
+    log(
         f"connect_timeout={CONNECT_TIMEOUT}s "
-        f"read_timeout={READ_TIMEOUT}s",
-        file=sys.stderr,
+        f"read_timeout={READ_TIMEOUT}s"
     )
-    print(
-        "max_attempts=1",
-        file=sys.stderr,
-    )
+    log("max_attempts=1")
 
     started = time.monotonic()
 
@@ -516,319 +502,296 @@ def call_openrouter(prompt, uuid, name):
             OPENROUTER_URL,
             headers=headers,
             json=payload,
-            timeout=(
-                CONNECT_TIMEOUT,
-                READ_TIMEOUT,
-            ),
+            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
         )
-    except requests.exceptions.Timeout as exc:
+    except requests.exceptions.ConnectTimeout as exc:
         elapsed = time.monotonic() - started
 
-        print(
-            f"OPENROUTER TIMEOUT "
-            f"name={name} uuid={uuid} "
-            f"elapsed={elapsed:.1f}s",
-            file=sys.stderr,
+        log(
+            f"OPENROUTER CONNECT TIMEOUT "
+            f"name={name} uuid={uuid} elapsed={elapsed:.1f}s"
         )
 
         raise RuntimeError(
-            "OpenRouter request timed out"
+            f"OpenRouter connection timeout after {elapsed:.1f}s"
+        ) from exc
+
+    except requests.exceptions.ReadTimeout as exc:
+        elapsed = time.monotonic() - started
+
+        log(
+            f"OPENROUTER READ TIMEOUT "
+            f"name={name} uuid={uuid} elapsed={elapsed:.1f}s"
+        )
+
+        raise RuntimeError(
+            f"OpenRouter read timeout after {elapsed:.1f}s"
         ) from exc
 
     except requests.exceptions.RequestException as exc:
         elapsed = time.monotonic() - started
 
-        print(
+        log(
             f"OPENROUTER REQUEST ERROR "
-            f"name={name} uuid={uuid} "
-            f"elapsed={elapsed:.1f}s "
-            f"error_type={type(exc).__name__}",
-            file=sys.stderr,
+            f"name={name} uuid={uuid} elapsed={elapsed:.1f}s"
         )
 
         raise RuntimeError(
-            f"OpenRouter request failed: {type(exc).__name__}"
+            f"OpenRouter request error: {exc}"
         ) from exc
 
     elapsed = time.monotonic() - started
 
-    print(
+    log(
         f"OPENROUTER HTTP RESPONSE "
         f"name={name} uuid={uuid} "
         f"status={response.status_code} "
         f"elapsed={elapsed:.1f}s "
-        f"bytes={len(response.content)}",
-        file=sys.stderr,
+        f"bytes={len(response.content)}"
     )
 
     if response.status_code != 200:
-        preview = response.text[:500]
+        body_preview = response.text[:1000].replace("\n", "\\n")
 
-        print(
-            "OPENROUTER ERROR RESPONSE PREVIEW:",
-            file=sys.stderr,
-        )
-        print(
-            preview,
-            file=sys.stderr,
+        log(
+            f"OPENROUTER HTTP ERROR BODY PREVIEW: "
+            f"{body_preview}"
         )
 
         raise RuntimeError(
-            f"OpenRouter HTTP {response.status_code}"
+            f"OpenRouter HTTP status {response.status_code}"
         )
 
     try:
         data = response.json()
-    except ValueError as exc:
-        raise ValueError(
-            "OpenRouter returned invalid JSON"
+    except json.JSONDecodeError as exc:
+        body_preview = response.text[:1000].replace("\n", "\\n")
+
+        log(
+            f"OPENROUTER RESPONSE JSON PARSE FAILED "
+            f"name={name} uuid={uuid}"
+        )
+        log(
+            f"HTTP BODY PREVIEW: {body_preview}"
+        )
+
+        raise RuntimeError(
+            f"Failed to parse OpenRouter HTTP response as JSON: {exc}"
         ) from exc
 
-    print(
+    log(
         f"OPENROUTER RESPONSE STRUCTURE "
         f"name={name} uuid={uuid} "
-        f"top_level_keys={list(data.keys())}",
-        file=sys.stderr,
+        f"top_level_keys={list(data.keys())}"
     )
 
     choices = data.get("choices")
 
     if not isinstance(choices, list) or not choices:
-        raise ValueError(
+        raise RuntimeError(
             "OpenRouter response contains no choices"
         )
 
-    print(
+    log(
         f"OPENROUTER CHOICES "
-        f"name={name} uuid={uuid} "
-        f"count={len(choices)}",
-        file=sys.stderr,
+        f"name={name} uuid={uuid} count={len(choices)}"
     )
 
     message = choices[0].get("message")
 
     if not isinstance(message, dict):
-        raise ValueError(
-            "OpenRouter response contains no message"
+        raise RuntimeError(
+            "OpenRouter response contains no message object"
         )
 
-    print(
+    log(
         f"OPENROUTER MESSAGE FOUND "
         f"name={name} uuid={uuid} "
-        f"message_keys={list(message.keys())}",
-        file=sys.stderr,
+        f"message_keys={list(message.keys())}"
     )
+
+    refusal = message.get("refusal")
+
+    if refusal:
+        log(
+            f"OPENROUTER REFUSAL "
+            f"name={name} uuid={uuid} "
+            f"refusal={str(refusal)[:1000]}"
+        )
+
+        raise RuntimeError(
+            "OpenRouter returned a refusal"
+        )
 
     content = message.get("content")
 
     if not isinstance(content, str):
-        raise ValueError(
+        raise RuntimeError(
             "OpenRouter message content is not a string"
         )
 
-    print(
+    log(
         f"OPENROUTER AI CONTENT RECEIVED "
         f"name={name} uuid={uuid} "
-        f"content_length={len(content)}",
-        file=sys.stderr,
+        f"content_length={len(content)}"
     )
 
     return content
 
 
-def main():
-    if len(sys.argv) != 2:
-        print(
-            "Usage: python scripts/research_one_vtuber.py <uuid>",
-            file=sys.stderr,
-        )
-        return 1
+def research(uuid, name):
+    started_at = utc_now()
 
-    uuid = sys.argv[1]
+    log("RESEARCH START")
+    log(f"uuid={uuid}")
+    log(f"RESEARCH TARGET name={name} uuid={uuid}")
 
-    print(
-        "RESEARCH START",
-        file=sys.stderr,
-    )
-    print(
-        f"uuid={uuid}",
-        file=sys.stderr,
-    )
+    prompt = build_prompt(uuid, name)
 
-    try:
-        vdb = load_json(VDB_PATH)
-    except Exception as exc:
-        print(
-            f"RESEARCH FAILED "
-            f"name=UNKNOWN uuid={uuid} "
-            f"error_type=vdb_load_error "
-            f"message={exc}",
-            file=sys.stderr,
-        )
-        return 1
-
-    record = find_vtuber(vdb, uuid)
-
-    if record is None:
-        print(
-            f"RESEARCH FAILED "
-            f"name=UNKNOWN uuid={uuid} "
-            f"error_type=vtuber_not_found",
-            file=sys.stderr,
-        )
-        return 1
-
-    name = get_japanese_name(record)
-
-    if not name:
-        print(
-            f"RESEARCH FAILED "
-            f"name={name} uuid={uuid} "
-            f"error_type=missing_japanese_name",
-            file=sys.stderr,
-        )
-        return 1
-
-    print(
-        f"RESEARCH TARGET name={name} uuid={uuid}",
-        file=sys.stderr,
-    )
-
-    prompt = build_research_prompt(record)
-
-    print(
+    log(
         f"RESEARCH PROMPT READY "
         f"name={name} uuid={uuid} "
-        f"prompt_length={len(prompt)}",
-        file=sys.stderr,
+        f"prompt_length={len(prompt)}"
     )
 
-    checked_at = utc_now()
-
     try:
-        content = call_openrouter(
+        content = request_openrouter(
+            uuid=uuid,
+            name=name,
             prompt=prompt,
+        )
+
+        log(
+            f"AI RESPONSE RECEIVED "
+            f"name={name} "
+            f"content_length={len(content)}"
+        )
+
+        try:
+            data = extract_json_object(content)
+
+        except ValueError as exc:
+            log(
+                f"AI RESPONSE PARSE FAILED "
+                f"name={name} "
+                f"error_type=invalid_json"
+            )
+
+            preview = content[:1000].replace("\n", "\\n")
+
+            log(
+                f"AI RESPONSE START PREVIEW: {preview}"
+            )
+
+            if len(content) > 1000:
+                end_preview = content[-1000:].replace("\n", "\\n")
+
+                log(
+                    f"AI RESPONSE END PREVIEW: {end_preview}"
+                )
+
+            raise ValueError(
+                "Failed to parse AI response as a JSON object"
+            ) from exc
+
+        log(
+            f"AI JSON PARSED "
+            f"name={name} uuid={uuid}"
+        )
+
+        data = validate_result(
+            data=data,
             uuid=uuid,
             name=name,
         )
 
-        print(
-            f"AI RESPONSE RECEIVED "
+        finished_at = utc_now()
+
+        result = {
+            "uuid": data["uuid"],
+            "name": data["name"],
+            "reading": data["reading"],
+            "source": data["source"],
+            "source_type": data["source_type"],
+            "confidence": data["confidence"],
+            "status": data["status"],
+            "notes": data["notes"],
+            "checked_at": finished_at,
+            "last_attempted_at": finished_at,
+            "last_attempt_result": "success",
+        }
+
+        upsert_result(result)
+
+        log(
+            f"RESULT SAVED "
             f"name={name} "
-            f"content_length={len(content)}",
-            file=sys.stderr,
-        )
-
-        result = extract_json_object(content)
-
-        if result is None:
-            print(
-                f"AI RESPONSE PARSE FAILED "
-                f"name={name} "
-                f"error_type=invalid_json",
-                file=sys.stderr,
-            )
-
-            print(
-                "AI RESPONSE START PREVIEW: "
-                + content[:500],
-                file=sys.stderr,
-            )
-
-            print(
-                "AI RESPONSE END PREVIEW: "
-                + content[-500:],
-                file=sys.stderr,
-            )
-
-            raise ValueError(
-                "Failed to parse AI response as a JSON object"
-            )
-
-        result = validate_result(
-            result=result,
-            expected_uuid=uuid,
-            expected_name=name,
-        )
-
-        print(
-            f"AI RESPONSE PARSED "
-            f"name={name} "
-            f"status={result['status']} "
-            f"confidence={result['confidence']} "
-            f"reading_present={bool(result['reading'])} "
-            f"source_present={bool(result['source'])}",
-            file=sys.stderr,
-        )
-
-        result["checked_at"] = checked_at
-
-        save_success_result(result)
-
-        print(
-            f"RESEARCH SUCCESS "
-            f"name={name} uuid={uuid} "
+            f"uuid={uuid} "
             f"reading={result['reading']} "
             f"status={result['status']} "
-            f"confidence={result['confidence']}",
-            file=sys.stderr,
+            f"confidence={result['confidence']}"
         )
 
-        print(
-            f"RESULT SAVED "
-            f"name={name} uuid={uuid} "
-            f"status={result['status']} "
-            f"confidence={result['confidence']}",
-            file=sys.stderr,
-        )
-
-        print(
-            f"RESEARCH FINISHED "
-            f"name={name} uuid={uuid} "
-            f"status={result['status']}",
-            file=sys.stderr,
-        )
-
-        print(
-            json.dumps(
-                {
-                    "uuid": result["uuid"],
-                    "name": result["name"],
-                    "reading": result["reading"],
-                    "status": result["status"],
-                    "confidence": result["confidence"],
-                    "checked_at": result["checked_at"],
-                },
-                ensure_ascii=False,
-            )
+        log(
+            f"RESEARCH SUCCESS "
+            f"name={name} uuid={uuid}"
         )
 
         return 0
 
     except Exception as exc:
-        print(
-            f"RESEARCH FAILED "
-            f"name={name} uuid={uuid} "
-            f"error_type={type(exc).__name__} "
-            f"message={exc}",
-            file=sys.stderr,
+        failure = make_failure_record(
+            uuid=uuid,
+            name=name,
+            started_at=started_at,
         )
 
         try:
-            save_failure_state(
-                uuid=uuid,
-                name=name,
-            )
-        except Exception as save_exc:
-            print(
-                f"FAILURE STATE SAVE ERROR "
-                f"name={name} uuid={uuid} "
-                f"error_type={type(save_exc).__name__} "
-                f"message={save_exc}",
-                file=sys.stderr,
+            upsert_result(failure)
+
+            log(
+                f"FAILURE STATE SAVED "
+                f"name={name} "
+                f"uuid={uuid} "
+                f"status=pending "
+                f"last_attempt_result=error"
             )
 
+        except Exception as save_exc:
+            log(
+                f"FAILURE STATE SAVE FAILED "
+                f"name={name} "
+                f"uuid={uuid} "
+                f"error_type={type(save_exc).__name__} "
+                f"message={save_exc}"
+            )
+
+        log(
+            f"RESEARCH FAILED "
+            f"name={name} "
+            f"uuid={uuid} "
+            f"error_type={type(exc).__name__} "
+            f"message={exc}"
+        )
+
         return 1
+
+
+def main():
+    if len(sys.argv) != 3:
+        print(
+            "Usage: python scripts/research_one_vtuber.py <uuid> <name>",
+            file=sys.stderr,
+        )
+        return 2
+
+    uuid = sys.argv[1]
+    name = sys.argv[2]
+
+    return research(
+        uuid=uuid,
+        name=name,
+    )
 
 
 if __name__ == "__main__":
