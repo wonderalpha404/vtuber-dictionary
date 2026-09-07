@@ -1,0 +1,6 @@
+{
+  "steps": [
+    "normalize_vdb",
+    "kana"
+  ]
+}
