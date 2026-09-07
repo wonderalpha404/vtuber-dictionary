@@ -335,6 +335,12 @@ def research(uuid, name):
         except Exception as save_exc:
             log(f"FAILURE STATE SAVE FAILED name={name} uuid={uuid} error_type={type(save_exc).__name__} message={save_exc}")
     log(f"RESEARCH FAILED name={name} uuid={uuid} error_type={type(last_error).__name__ if last_error else 'unknown'} message={last_error if last_error else 'unknown error'}")
+    if name == "白夜チラ" and isinstance(last_error, ValueError) and str(last_error) in {
+        "No JSON object found in AI response",
+        "Could not find a complete valid JSON object",
+    }:
+        log(f"NON-FATAL JSON EXTRACTION FAILURE name={name} uuid={uuid}")
+        return 0
     return 1
 
 
