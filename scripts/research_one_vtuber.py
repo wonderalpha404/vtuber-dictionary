@@ -1,421 +1,465 @@
 #!/usr/bin/env python3
-"""Research script for a single VTuber using OpenRouter API with web search.
-
-Accepts a UUID as the sole positional argument.
-
-Uses source/vdb.json (read-only) to find the VTuber entry and its name.jp.
-
-On successful research, writes/updates source/vtuber-readings.json.
-
-On technical failure, writes only a minimal failure-state record to
-source/vtuber-readings.json and exits with a non-zero status.
-
-Detailed errors, API responses, stderr information, and exception details are
-never stored in vtuber-readings.json. They are emitted only to stderr so they
-are visible in GitHub Actions logs.
-"""
 
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Optional
 
 import requests
 
 
+VDB_PATH = "source/vdb.json"
+RESULT_PATH = "source/vtuber-readings.json"
+
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "openrouter/free"
 
-# Maximum number of API attempts for transient failures.
-MAX_API_ATTEMPTS = 3
-
-# Requests timeout:
-# - connect timeout: 15 seconds
-# - read timeout: 60 seconds
-#
-# This is intentionally not an extremely short timeout because Web Search
-# may take some time.
-REQUEST_TIMEOUT = (15, 60)
-
-# Maximum amount of AI response content shown in Actions logs when parsing
-# fails. Never print the complete response.
-RESPONSE_PREVIEW_LIMIT = 500
+CONNECT_TIMEOUT = 15
+READ_TIMEOUT = 60
 
 
-def utc_now() -> str:
-    """Return current UTC time in ISO-8601 format."""
+def utc_now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def log(message: str) -> None:
-    """Write a diagnostic message to stderr."""
-    print(message, file=sys.stderr)
+def load_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
-def load_json_file(file_path: str) -> Any:
-    """Load JSON file with error handling."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+def save_json(path, data):
+    temp_path = path + ".tmp"
 
-    except FileNotFoundError:
-        log(f"ERROR: JSON file not found: {file_path}")
-        sys.exit(1)
+    with open(temp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
 
-    except json.JSONDecodeError as e:
-        log(
-            f"ERROR: Invalid JSON in {file_path}: "
-            f"line={e.lineno} column={e.colno} message={e.msg}"
-        )
-        sys.exit(1)
+    os.replace(temp_path, path)
 
 
-def find_vdb_entry_by_uuid(
-    vdb_data: dict,
-    uuid: str,
-) -> Optional[dict]:
-    """Find VTuber entry in VDB by UUID."""
-    vtbs = vdb_data.get("vtbs", [])
-
-    if not isinstance(vtbs, list):
-        log("ERROR: VDB 'vtbs' field is not an array.")
-        sys.exit(1)
-
-    for vtuber in vtbs:
-        if isinstance(vtuber, dict) and vtuber.get("uuid") == uuid:
-            return vtuber
+def find_vtuber(vdb, uuid):
+    for record in vdb.get("vtbs", []):
+        if record.get("uuid") == uuid:
+            return record
 
     return None
 
 
-def build_auxiliary_info(vdb_entry: Optional[dict]) -> str:
-    """Build auxiliary information from VDB entry."""
-    if not vdb_entry:
+def get_japanese_name(record):
+    name = record.get("name", {})
+
+    if not isinstance(name, dict):
         return ""
 
-    aux_lines = []
-    name_obj = vdb_entry.get("name", {})
+    jp = name.get("jp")
 
-    if not isinstance(name_obj, dict):
+    if not isinstance(jp, str):
         return ""
 
-    for key in ["jp", "cn", "en", "default", "extra"]:
-        if key not in name_obj:
-            continue
-
-        value = name_obj[key]
-
-        if isinstance(value, list):
-            aux_lines.append(
-                f"  {key}: {', '.join(str(v) for v in value)}"
-            )
-        else:
-            aux_lines.append(f"  {key}: {value}")
-
-    return "\n".join(aux_lines) if aux_lines else ""
+    return jp.strip()
 
 
-def build_research_prompt(
-    name_jp: str,
-    uuid: str,
-    entry: dict,
-    aux_info: str,
-) -> str:
-    """Build a strict, bounded research prompt for the AI."""
+def build_research_prompt(record):
+    uuid = record.get("uuid", "")
+    name = get_japanese_name(record)
 
-    return f"""You are researching the actual Japanese reading/pronunciation of a specific VTuber's name.
+    return f"""
+あなたはVTuberデータベースの調査担当です。
 
-TARGET VTUBER:
-- Japanese name: {name_jp}
-- UUID: {uuid}
+以下のVTuberについて、日本語表記の正式な読み方を調査してください。
 
-Auxiliary VDB information:
-{aux_info if aux_info else "  No auxiliary information available"}
+UUID:
+{uuid}
 
-Your task is ONLY to determine the actual reading of this exact VTuber's Japanese name.
+名前:
+{name}
 
-RESEARCH ORDER
-==============
+目的:
+VTuber名を日本語IME辞書に登録するため、名前の正確な読み方を取得します。
 
-STEP 1 — Official sources
-Search official sources first, including:
-- official website
-- official profile
-- official X/Twitter profile
-- official YouTube/channel profile
-- official agency/talent profile
-- official event/profile pages
+【最重要ルール】
 
-If an official source clearly establishes the reading, use it and stop searching.
+1. 最終回答は必ずJSONオブジェクト1個だけにしてください。
+2. JSON以外の文章を絶対に出力しないでください。
+3. Markdownのコードブロックも使用しないでください。
+4. 調査途中の説明、検索状況、推論、コメントなどを出力しないでください。
+5. 読み方を確定できない場合でも、必ずJSONを返してください。
+6. 読み方を推測してはいけません。
+7. 漢字から一般的に推測できる読みだけを根拠にしてはいけません。
+8. 検索結果に似た名前の別VTuberが出た場合、それを対象VTuberとして扱ってはいけません。
+9. 名前とUUIDが一致する対象を優先してください。
+10. 無限に検索を続けないでください。十分な証拠が得られなければunknownとして終了してください。
 
-STEP 2 — Reliable third-party sources
-If official sources do not establish the reading, check a small number of reliable third-party sources, prioritizing:
-- Japanese Wikipedia
-- established VTuber databases
-- established Japanese media/reference sites
-- reliable profile/database pages that clearly identify this exact VTuber
+【調査優先順位】
 
-Wikipedia is acceptable as a trustworthy third-party source.
-If Wikipedia is the only reliable evidence, normally use confidence "medium", not "high".
+第1優先:
+- VTuber本人の公式プロフィール
+- 公式サイト
+- 公式SNS
+- 公式YouTube等のプロフィール
+- 所属事務所・公式運営ページ
 
-If reliable third-party sources clearly agree on the reading, stop searching.
+第2優先:
+- Wikipedia
+- 信頼できるVTuberデータベース
+- 日本語の信頼できるメディア・人物情報サイト
 
-STEP 3 — Limited additional search
-Only if the reading is still unresolved, perform a limited search for the exact VTuber name.
+第3優先:
+- 上記で不足する場合のみ、名前を完全一致させた追加検索
 
-Do NOT:
-- search indefinitely
-- repeatedly search the same query
-- investigate unrelated biography
-- search broadly for unrelated people with similar names
+Wikipediaは第三者情報源として利用できます。
+ただしWikipediaだけで確認できた場合、通常はconfidenceをmediumとしてください。
 
-If reliable evidence is still unavailable after the limited search, return:
-- reading = ""
-- confidence = "unknown"
-- status = "unknown"
+【別人判定】
 
-STRICT EVIDENCE RULES
-=====================
+名前が似ているだけの人物・VTuberは絶対に同一人物として扱わないでください。
 
-1. Never guess the reading.
-2. Never infer a reading merely from normal Japanese kanji pronunciation.
-3. Never say "this name is usually read..." without actual evidence.
-4. Never use information from a different person, character, company, group, or VTuber.
-5. The evidence must identify this exact VTuber.
-6. Do not rely solely on search-result snippets.
-7. When possible, verify the actual source page.
-8. Do not fabricate URLs.
-9. Only include URLs that were actually used as evidence.
-10. If sources conflict, use status "review".
-11. If reliable evidence establishes the reading without meaningful conflict, use "verified".
-12. If reliable evidence exists only from weaker third-party sources, use "review" or "medium" as appropriate.
-13. If no reliable evidence exists, use "unknown".
-14. Once sufficient evidence is found, STOP SEARCHING.
+特に、
+{name}
+と表記が少しでも異なる人物が検索結果に出た場合、
+その人物の読みを今回の対象の読みとして採用しないでください。
 
-CONFIDENCE RULES
-================
+【JSON形式】
 
-- high:
-  Clear official source, or exceptionally strong corroborated evidence.
-- medium:
-  Reliable third-party evidence, including Wikipedia or established databases.
-- review:
-  Conflicting or materially uncertain evidence.
-- unknown:
-  No reliable evidence establishing the reading.
-
-STATUS RULES
-============
-
-- verified:
-  Reliable evidence establishes the reading and there is no meaningful conflict.
-- review:
-  Evidence exists but there is uncertainty or conflict.
-- unknown:
-  No reliable evidence establishes the reading.
-
-Never use "verified" or "review" with an empty reading.
-
-OUTPUT REQUIREMENTS
-===================
-
-You MUST return exactly one JSON object.
-
-The response MUST:
-- contain only JSON
-- contain no Markdown
-- contain no ```json code fence
-- contain no explanation before or after the JSON
-- contain exactly these seven keys:
+必ず以下の形式だけを返してください。
 
 {{
-  "name": "{name_jp}",
+  "uuid": "{uuid}",
+  "name": "{name}",
   "reading": "",
+  "status": "unknown",
+  "confidence": "unknown",
   "source": "",
   "source_type": "",
-  "confidence": "high",
-  "status": "verified",
   "notes": ""
 }}
 
-The values must follow these rules:
+【status】
 
-name:
-- Must exactly equal the target Japanese name: {name_jp}
+verified:
+信頼できる情報源によって読み方を確認できた場合。
 
-reading:
-- Actual Japanese reading only.
-- Empty string if reliable evidence was not found.
+review:
+候補となる読みはあるが、十分な確証がない場合。
 
-source:
-- URL or concise list of URLs actually used as evidence.
-- Empty only when confidence is unknown.
+unknown:
+信頼できる読みを確認できなかった場合。
 
-source_type:
-- Describe the evidence type briefly, for example:
-  "official"
-  "official_profile"
-  "wikipedia"
-  "database"
-  "official_and_database"
+【confidence】
 
-confidence:
-- Exactly one of:
-  "high"
-  "medium"
-  "review"
-  "unknown"
+high:
+公式情報など非常に強い根拠がある。
 
-status:
-- Exactly one of:
-  "verified"
-  "review"
-  "unknown"
+medium:
+Wikipedia、信頼できるVTuberデータベース、複数の第三者情報源などで確認できる。
 
-notes:
-- Concise explanation of the evidence and conclusion.
-- Do not include unrelated biography.
-- Do not fabricate evidence.
+review:
+根拠が弱い、または情報源間に不一致がある。
 
-IMPORTANT:
-Do not return Markdown.
-Do not return commentary.
-Do not return multiple JSON objects.
-Do not return a JSON array.
-Return one valid JSON object only.
-"""
+unknown:
+読みを確認できない。
 
+【reading】
 
-def classify_http_error(status_code: int) -> str:
-    """Classify an HTTP status code."""
-    if status_code == 429:
-        return "http_429_rate_limited"
+確認できた正式な日本語読みをひらがなで記入してください。
 
-    if 400 <= status_code <= 499:
-        return f"http_{status_code}_client_error"
+確認できない場合は空文字列にしてください。
 
-    if status_code == 500:
-        return "http_500_server_error"
+絶対に推測で埋めないでください。
 
-    if status_code == 502:
-        return "http_502_bad_gateway"
+【source】
 
-    if status_code == 503:
-        return "http_503_service_unavailable"
+読み方を確認したURLを1つ以上記載してください。
 
-    if status_code == 504:
-        return "http_504_gateway_timeout"
+確認できない場合は空文字列にしてください。
 
-    if 500 <= status_code <= 599:
-        return f"http_{status_code}_server_error"
+【source_type】
 
-    return f"http_{status_code}"
+例えば以下を使用してください。
+
+official
+wikipedia
+vtuber_database
+media
+other
+
+確認できない場合は空文字列にしてください。
+
+【notes】
+
+必要な場合だけ簡潔に記載してください。
+
+ただし、長い調査記録や検索ログは書かないでください。
+
+最終出力はJSONオブジェクト1個だけです。
+""".strip()
 
 
-def is_retryable_http_status(status_code: int) -> bool:
-    """Return whether an HTTP status should be retried."""
-    return status_code == 429 or status_code in {
-        500,
-        502,
-        503,
-        504,
+def extract_json_object(text):
+    """
+    AIがJSON以外の文字を少量含めた場合に備え、
+    JSONオブジェクト部分だけを抽出する。
+
+    ただし、自然言語の調査文章しか返っていない場合は
+    JSONとして扱わず失敗にする。
+    """
+
+    text = text.strip()
+
+    # 完全なJSON
+    try:
+        parsed = json.loads(text)
+
+        if isinstance(parsed, dict):
+            return parsed
+
+    except json.JSONDecodeError:
+        pass
+
+    # ```json ... ``` の場合
+    fenced = re.search(
+        r"```(?:json)?\s*(\{.*\})\s*```",
+        text,
+        re.DOTALL,
+    )
+
+    if fenced:
+        try:
+            parsed = json.loads(fenced.group(1))
+
+            if isinstance(parsed, dict):
+                return parsed
+
+        except json.JSONDecodeError:
+            pass
+
+    # 最初の { から最後の } まで
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start >= 0 and end > start:
+        candidate = text[start:end + 1]
+
+        try:
+            parsed = json.loads(candidate)
+
+            if isinstance(parsed, dict):
+                return parsed
+
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+def validate_result(result, expected_uuid, expected_name):
+    if not isinstance(result, dict):
+        raise ValueError("AI response is not a JSON object")
+
+    required_fields = [
+        "uuid",
+        "name",
+        "reading",
+        "status",
+        "confidence",
+        "source",
+        "source_type",
+        "notes",
+    ]
+
+    missing = [
+        field
+        for field in required_fields
+        if field not in result
+    ]
+
+    if missing:
+        raise ValueError(
+            "Missing required fields: " + ", ".join(missing)
+        )
+
+    if result["uuid"] != expected_uuid:
+        raise ValueError(
+            f"UUID mismatch: expected={expected_uuid} "
+            f"actual={result['uuid']}"
+        )
+
+    if result["name"] != expected_name:
+        raise ValueError(
+            f"name mismatch: expected={expected_name} "
+            f"actual={result['name']}"
+        )
+
+    allowed_statuses = {
+        "verified",
+        "review",
+        "unknown",
     }
 
+    if result["status"] not in allowed_statuses:
+        raise ValueError(
+            f"Invalid status: {result['status']}"
+        )
 
-def preview_text(text: str, limit: int = RESPONSE_PREVIEW_LIMIT) -> str:
-    """Return a safe, short preview for diagnostics."""
-    if not text:
-        return "<empty>"
+    allowed_confidence = {
+        "high",
+        "medium",
+        "review",
+        "unknown",
+    }
 
-    normalized = text.replace("\r", "\\r").replace("\n", "\\n")
+    if result["confidence"] not in allowed_confidence:
+        raise ValueError(
+            f"Invalid confidence: {result['confidence']}"
+        )
 
-    if len(normalized) <= limit:
-        return normalized
+    reading = result["reading"]
 
-    return normalized[:limit] + "...[truncated]"
+    if not isinstance(reading, str):
+        raise ValueError("reading must be a string")
 
+    if result["status"] == "verified" and not reading.strip():
+        raise ValueError(
+            "verified result must have a non-empty reading"
+        )
 
-def response_preview_start(
-    text: str,
-    limit: int = RESPONSE_PREVIEW_LIMIT,
-) -> str:
-    """Return beginning of response for diagnostics."""
-    return preview_text(text[:limit], limit)
+    if result["status"] == "unknown" and reading.strip():
+        raise ValueError(
+            "unknown result must have an empty reading"
+        )
 
-
-def response_preview_end(
-    text: str,
-    limit: int = RESPONSE_PREVIEW_LIMIT,
-) -> str:
-    """Return end of response for diagnostics."""
-    if not text:
-        return "<empty>"
-
-    return preview_text(text[-limit:], limit)
+    return result
 
 
-def extract_message_content(message: dict) -> str:
-    """Extract assistant message content safely."""
-    content = message.get("content")
+def save_success_result(result):
+    results = load_json(RESULT_PATH)
 
-    if isinstance(content, str):
-        return content
+    if not isinstance(results, list):
+        raise ValueError(
+            f"{RESULT_PATH} must contain a JSON array"
+        )
 
-    # Some APIs/models may return structured content.
-    # We do not blindly convert arbitrary structures to JSON as the answer.
-    # Instead, explicitly support simple text-part arrays.
-    if isinstance(content, list):
-        text_parts = []
+    uuid = result["uuid"]
 
-        for part in content:
-            if not isinstance(part, dict):
-                continue
+    existing_index = None
 
-            text = part.get("text")
+    for index, item in enumerate(results):
+        if isinstance(item, dict) and item.get("uuid") == uuid:
+            existing_index = index
+            break
 
-            if isinstance(text, str):
-                text_parts.append(text)
+    result_to_save = {
+        "uuid": result["uuid"],
+        "name": result["name"],
+        "reading": result["reading"],
+        "source": result["source"],
+        "source_type": result["source_type"],
+        "confidence": result["confidence"],
+        "status": result["status"],
+        "notes": result["notes"],
+        "checked_at": utc_now(),
+    }
 
-        if text_parts:
-            return "".join(text_parts)
+    if existing_index is None:
+        results.append(result_to_save)
+    else:
+        existing = results[existing_index]
 
-    raise ValueError(
-        f"assistant message content has unsupported type: "
-        f"{type(content).__name__}"
+        # 既存の成功データを守る。
+        # 新しい成功結果だけを更新する。
+        if existing.get("status") in {
+            "verified",
+            "review",
+            "unknown",
+        }:
+            results[existing_index] = result_to_save
+        else:
+            results[existing_index] = result_to_save
+
+    save_json(RESULT_PATH, results)
+
+
+def save_failure_state(uuid, name):
+    """
+    詳細なエラー内容は保存しない。
+
+    保存するのは「失敗した」という状態だけ。
+    """
+
+    results = load_json(RESULT_PATH)
+
+    if not isinstance(results, list):
+        raise ValueError(
+            f"{RESULT_PATH} must contain a JSON array"
+        )
+
+    attempted_at = utc_now()
+
+    failure_state = {
+        "uuid": uuid,
+        "name": name,
+        "reading": "",
+        "source": "",
+        "source_type": "",
+        "confidence": "unknown",
+        "status": "pending",
+        "notes": "",
+        "checked_at": "",
+        "last_attempted_at": attempted_at,
+        "last_attempt_result": "error",
+    }
+
+    existing_index = None
+
+    for index, item in enumerate(results):
+        if isinstance(item, dict) and item.get("uuid") == uuid:
+            existing_index = index
+            break
+
+    if existing_index is None:
+        results.append(failure_state)
+    else:
+        existing = results[existing_index]
+
+        # 既存の成功結果を失敗で壊さない。
+        if existing.get("status") in {
+            "verified",
+            "review",
+            "unknown",
+        }:
+            print(
+                f"FAILURE STATE NOT OVERWRITTEN "
+                f"name={name} uuid={uuid}",
+                file=sys.stderr,
+            )
+        else:
+            results[existing_index] = failure_state
+
+    save_json(RESULT_PATH, results)
+
+    print(
+        f"FAILURE STATE SAVED "
+        f"name={name} uuid={uuid} "
+        f"status=pending "
+        f"last_attempt_result=error",
+        file=sys.stderr,
     )
 
 
-def call_openrouter_api(
-    prompt: str,
-    name_jp: str,
-    uuid: str,
-) -> str:
-    """Call OpenRouter API with bounded retries and detailed diagnostics."""
-
-    api_key = os.getenv("OPENROUTER_API_KEY")
+def call_openrouter(prompt, uuid, name):
+    api_key = os.environ.get("OPENROUTER_API_KEY")
 
     if not api_key:
-        log(
-            f"OPENROUTER ERROR: name={name_jp} uuid={uuid} "
-            "error_type=missing_api_key"
+        raise RuntimeError(
+            "OPENROUTER_API_KEY is not set"
         )
-        raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/wonderalpha404/vtuber-dictionary",
-        "X-Title": "VTuber Dictionary",
     }
-
-    tools = [
-        {
-            "type": "openrouter:web_search",
-        }
-    ]
 
     payload = {
         "model": OPENROUTER_MODEL,
@@ -425,1162 +469,367 @@ def call_openrouter_api(
                 "content": prompt,
             }
         ],
-        "tools": tools,
-        # Ask the provider/model for JSON output when supported.
-        # Response parsing below still handles models that return fenced JSON.
         "response_format": {
-            "type": "json_object",
+            "type": "json_object"
         },
+        "tools": [
+            {
+                "type": "openrouter:web_search"
+            }
+        ],
     }
 
-    log("")
-    log("OPENROUTER REQUEST")
-    log(f"name={name_jp}")
-    log(f"uuid={uuid}")
-    log(f"model={OPENROUTER_MODEL}")
-    log("web_search=true")
-    log(
-        f"connect_timeout={REQUEST_TIMEOUT[0]}s "
-        f"read_timeout={REQUEST_TIMEOUT[1]}s"
+    print(
+        "OPENROUTER REQUEST",
+        file=sys.stderr,
     )
-    log(f"max_attempts={MAX_API_ATTEMPTS}")
+    print(
+        f"name={name}",
+        file=sys.stderr,
+    )
+    print(
+        f"uuid={uuid}",
+        file=sys.stderr,
+    )
+    print(
+        f"model={OPENROUTER_MODEL}",
+        file=sys.stderr,
+    )
+    print(
+        "web_search=true",
+        file=sys.stderr,
+    )
+    print(
+        f"connect_timeout={CONNECT_TIMEOUT}s "
+        f"read_timeout={READ_TIMEOUT}s",
+        file=sys.stderr,
+    )
+    print(
+        "max_attempts=1",
+        file=sys.stderr,
+    )
 
-    last_exception: Optional[Exception] = None
+    started = time.monotonic()
 
-    for attempt in range(1, MAX_API_ATTEMPTS + 1):
-        log("")
-        log(
-            f"OPENROUTER ATTEMPT {attempt}/{MAX_API_ATTEMPTS} "
-            f"name={name_jp} uuid={uuid}"
+    try:
+        response = requests.post(
+            OPENROUTER_URL,
+            headers=headers,
+            json=payload,
+            timeout=(
+                CONNECT_TIMEOUT,
+                READ_TIMEOUT,
+            ),
+        )
+    except requests.exceptions.Timeout as exc:
+        elapsed = time.monotonic() - started
+
+        print(
+            f"OPENROUTER TIMEOUT "
+            f"name={name} uuid={uuid} "
+            f"elapsed={elapsed:.1f}s",
+            file=sys.stderr,
         )
 
-        try:
-            started = time.monotonic()
-
-            response = requests.post(
-                OPENROUTER_URL,
-                json=payload,
-                headers=headers,
-                timeout=REQUEST_TIMEOUT,
-            )
-
-            elapsed = time.monotonic() - started
-
-            log(
-                f"OPENROUTER HTTP RESPONSE "
-                f"name={name_jp} uuid={uuid} "
-                f"status={response.status_code} "
-                f"elapsed={elapsed:.1f}s "
-                f"bytes={len(response.content)}"
-            )
-
-            if response.status_code >= 400:
-                error_type = classify_http_error(
-                    response.status_code
-                )
-
-                log(
-                    f"OPENROUTER HTTP ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    f"error_type={error_type}"
-                )
-
-                # Log a short provider error preview.
-                log(
-                    "HTTP ERROR BODY PREVIEW: "
-                    f"{response_preview_start(response.text)}"
-                )
-
-                if (
-                    is_retryable_http_status(response.status_code)
-                    and attempt < MAX_API_ATTEMPTS
-                ):
-                    wait_seconds = 2 ** (attempt - 1)
-
-                    log(
-                        f"OPENROUTER RETRYING "
-                        f"name={name_jp} uuid={uuid} "
-                        f"wait={wait_seconds}s"
-                    )
-
-                    time.sleep(wait_seconds)
-                    continue
-
-                response.raise_for_status()
-
-            if not response.content:
-                error = RuntimeError("empty HTTP response body")
-
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=empty_http_response"
-                )
-
-                last_exception = error
-
-                if attempt < MAX_API_ATTEMPTS:
-                    wait_seconds = 2 ** (attempt - 1)
-                    log(
-                        f"OPENROUTER RETRYING "
-                        f"name={name_jp} uuid={uuid} "
-                        f"wait={wait_seconds}s"
-                    )
-                    time.sleep(wait_seconds)
-                    continue
-
-                raise error
-
-            try:
-                response_data = response.json()
-
-            except json.JSONDecodeError as e:
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=invalid_api_response_json "
-                    f"line={e.lineno} column={e.colno}"
-                )
-
-                log(
-                    "API RESPONSE PREVIEW: "
-                    f"{response_preview_start(response.text)}"
-                )
-
-                raise ValueError(
-                    "OpenRouter HTTP response was not valid JSON"
-                ) from e
-
-            if not isinstance(response_data, dict):
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=api_response_not_object"
-                )
-                raise ValueError(
-                    "OpenRouter API response is not a JSON object"
-                )
-
-            log(
-                "OPENROUTER RESPONSE STRUCTURE "
-                f"name={name_jp} uuid={uuid} "
-                f"top_level_keys={sorted(response_data.keys())}"
-            )
-
-            if "error" in response_data:
-                error_obj = response_data.get("error")
-
-                log(
-                    f"OPENROUTER API ERROR OBJECT "
-                    f"name={name_jp} uuid={uuid} "
-                    f"error_type=api_error"
-                )
-
-                if isinstance(error_obj, dict):
-                    log(
-                        f"API error code={error_obj.get('code')} "
-                        f"type={error_obj.get('type')} "
-                        f"message={preview_text(str(error_obj.get('message', '')))}"
-                    )
-
-                raise RuntimeError("OpenRouter returned an API error object")
-
-            if "choices" not in response_data:
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=missing_choices"
-                )
-                raise ValueError("'choices' field not found")
-
-            choices = response_data.get("choices")
-
-            if not isinstance(choices, list):
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=choices_not_array"
-                )
-                raise ValueError("'choices' is not an array")
-
-            log(
-                f"OPENROUTER CHOICES "
-                f"name={name_jp} uuid={uuid} "
-                f"count={len(choices)}"
-            )
-
-            if not choices:
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=empty_choices"
-                )
-                raise ValueError("empty choices array")
-
-            first_choice = choices[0]
-
-            if not isinstance(first_choice, dict):
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=invalid_first_choice"
-                )
-                raise ValueError("first choice is not an object")
-
-            message = first_choice.get("message")
-
-            if not isinstance(message, dict):
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=missing_message"
-                )
-                raise ValueError("message is missing or invalid")
-
-            log(
-                "OPENROUTER MESSAGE FOUND "
-                f"name={name_jp} uuid={uuid} "
-                f"message_keys={sorted(message.keys())}"
-            )
-
-            content = extract_message_content(message)
-
-            if not content.strip():
-                log(
-                    f"OPENROUTER ERROR "
-                    f"name={name_jp} uuid={uuid} "
-                    "error_type=empty_ai_content"
-                )
-                raise ValueError("assistant message content is empty")
-
-            log(
-                "OPENROUTER AI CONTENT RECEIVED "
-                f"name={name_jp} uuid={uuid} "
-                f"content_length={len(content)}"
-            )
-
-            return content
-
-        except requests.exceptions.Timeout as e:
-            last_exception = e
-
-            log(
-                f"OPENROUTER ERROR "
-                f"name={name_jp} uuid={uuid} "
-                "error_type=timeout "
-                f"attempt={attempt}/{MAX_API_ATTEMPTS}"
-            )
-
-            if attempt < MAX_API_ATTEMPTS:
-                wait_seconds = 2 ** (attempt - 1)
-                log(
-                    f"OPENROUTER RETRYING "
-                    f"name={name_jp} uuid={uuid} "
-                    f"wait={wait_seconds}s"
-                )
-                time.sleep(wait_seconds)
-                continue
-
-            raise RuntimeError(
-                "OpenRouter request timed out after all attempts"
-            ) from e
-
-        except requests.exceptions.ConnectionError as e:
-            last_exception = e
-
-            log(
-                f"OPENROUTER ERROR "
-                f"name={name_jp} uuid={uuid} "
-                "error_type=connection_error "
-                f"attempt={attempt}/{MAX_API_ATTEMPTS}"
-            )
-
-            if attempt < MAX_API_ATTEMPTS:
-                wait_seconds = 2 ** (attempt - 1)
-                log(
-                    f"OPENROUTER RETRYING "
-                    f"name={name_jp} uuid={uuid} "
-                    f"wait={wait_seconds}s"
-                )
-                time.sleep(wait_seconds)
-                continue
-
-            raise RuntimeError(
-                "OpenRouter connection failed after all attempts"
-            ) from e
-
-        except requests.exceptions.HTTPError as e:
-            last_exception = e
-
-            status_code = (
-                e.response.status_code
-                if e.response is not None
-                else None
-            )
-
-            log(
-                f"OPENROUTER ERROR "
-                f"name={name_jp} uuid={uuid} "
-                "error_type=http_error "
-                f"status={status_code}"
-            )
-
-            raise
-
-        except requests.exceptions.RequestException as e:
-            last_exception = e
-
-            log(
-                f"OPENROUTER ERROR "
-                f"name={name_jp} uuid={uuid} "
-                f"error_type=request_exception "
-                f"message={preview_text(str(e))}"
-            )
-
-            raise
-
-        except Exception as e:
-            last_exception = e
-
-            log(
-                f"OPENROUTER PROCESSING ERROR "
-                f"name={name_jp} uuid={uuid} "
-                f"error_type={type(e).__name__} "
-                f"message={preview_text(str(e))}"
-            )
-
-            raise
-
-    if last_exception is not None:
         raise RuntimeError(
-            "OpenRouter request failed after all attempts"
-        ) from last_exception
+            "OpenRouter request timed out"
+        ) from exc
 
-    raise RuntimeError("OpenRouter request failed")
+    except requests.exceptions.RequestException as exc:
+        elapsed = time.monotonic() - started
 
-
-def strip_markdown_json_fence(content: str) -> str:
-    """Remove a Markdown JSON code fence if one was returned."""
-    text = content.strip()
-
-    if not text.startswith("```"):
-        return text
-
-    lines = text.splitlines()
-
-    if not lines:
-        return text
-
-    # Remove opening fence such as ``` or ```json.
-    first_line = lines[0].strip()
-
-    if not first_line.startswith("```"):
-        return text
-
-    lines = lines[1:]
-
-    # Remove closing fence if present.
-    if lines and lines[-1].strip() == "```":
-        lines = lines[:-1]
-
-    return "\n".join(lines).strip()
-
-
-def try_extract_json_object(content: str) -> Optional[str]:
-    """
-    Attempt to extract one JSON object from surrounding text.
-
-    This is a fallback only.
-
-    We do NOT attempt arbitrary correction or fabrication of JSON.
-    """
-    text = content.strip()
-
-    if not text:
-        return None
-
-    # First try the entire content.
-    try:
-        parsed = json.loads(text)
-
-        if isinstance(parsed, dict):
-            return text
-
-    except json.JSONDecodeError:
-        pass
-
-    # Then handle Markdown fence.
-    unfenced = strip_markdown_json_fence(text)
-
-    if unfenced != text:
-        try:
-            parsed = json.loads(unfenced)
-
-            if isinstance(parsed, dict):
-                return unfenced
-
-        except json.JSONDecodeError:
-            pass
-
-    # Last safe fallback:
-    # locate the first { and last } and try that exact substring.
-    #
-    # We do not modify its contents.
-    first_brace = text.find("{")
-    last_brace = text.rfind("}")
-
-    if first_brace >= 0 and last_brace > first_brace:
-        candidate = text[first_brace:last_brace + 1]
-
-        try:
-            parsed = json.loads(candidate)
-
-            if isinstance(parsed, dict):
-                return candidate
-
-        except json.JSONDecodeError:
-            pass
-
-    return None
-
-
-def parse_ai_response(
-    content: str,
-    expected_name: str,
-) -> dict:
-    """Parse and strictly validate AI response JSON."""
-
-    raw_content = content.strip()
-
-    if not raw_content:
-        log(
-            f"AI RESPONSE PARSE FAILED "
-            f"name={expected_name} error_type=empty_content"
+        print(
+            f"OPENROUTER REQUEST ERROR "
+            f"name={name} uuid={uuid} "
+            f"elapsed={elapsed:.1f}s "
+            f"error_type={type(exc).__name__}",
+            file=sys.stderr,
         )
-        raise ValueError("AI response content is empty")
 
-    log(
-        f"AI RESPONSE RECEIVED "
-        f"name={expected_name} "
-        f"content_length={len(raw_content)}"
+        raise RuntimeError(
+            f"OpenRouter request failed: {type(exc).__name__}"
+        ) from exc
+
+    elapsed = time.monotonic() - started
+
+    print(
+        f"OPENROUTER HTTP RESPONSE "
+        f"name={name} uuid={uuid} "
+        f"status={response.status_code} "
+        f"elapsed={elapsed:.1f}s "
+        f"bytes={len(response.content)}",
+        file=sys.stderr,
     )
 
-    json_text = try_extract_json_object(raw_content)
+    if response.status_code != 200:
+        preview = response.text[:500]
 
-    if json_text is None:
-        log(
-            f"AI RESPONSE PARSE FAILED "
-            f"name={expected_name} "
-            "error_type=invalid_json"
+        print(
+            "OPENROUTER ERROR RESPONSE PREVIEW:",
+            file=sys.stderr,
+        )
+        print(
+            preview,
+            file=sys.stderr,
         )
 
-        log(
-            f"AI RESPONSE START PREVIEW: "
-            f"{response_preview_start(raw_content)}"
-        )
-
-        log(
-            f"AI RESPONSE END PREVIEW: "
-            f"{response_preview_end(raw_content)}"
-        )
-
-        raise ValueError(
-            "Failed to parse AI response as a JSON object"
+        raise RuntimeError(
+            f"OpenRouter HTTP {response.status_code}"
         )
 
     try:
-        result = json.loads(json_text)
-
-    except json.JSONDecodeError as e:
-        log(
-            f"AI RESPONSE PARSE FAILED "
-            f"name={expected_name} "
-            "error_type=json_decode_error "
-            f"line={e.lineno} "
-            f"column={e.colno} "
-            f"message={e.msg}"
-        )
-
-        log(
-            f"AI RESPONSE START PREVIEW: "
-            f"{response_preview_start(raw_content)}"
-        )
-
-        log(
-            f"AI RESPONSE END PREVIEW: "
-            f"{response_preview_end(raw_content)}"
-        )
-
-        raise
-
-    if not isinstance(result, dict):
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=not_object"
-        )
-        raise ValueError("AI response is not a JSON object")
-
-    required_keys = [
-        "name",
-        "reading",
-        "source",
-        "source_type",
-        "confidence",
-        "status",
-        "notes",
-    ]
-
-    missing_keys = [
-        key for key in required_keys
-        if key not in result
-    ]
-
-    if missing_keys:
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=missing_keys "
-            f"keys={missing_keys}"
-        )
+        data = response.json()
+    except ValueError as exc:
         raise ValueError(
-            f"Missing required keys: {', '.join(missing_keys)}"
-        )
+            "OpenRouter returned invalid JSON"
+        ) from exc
 
-    if result["name"] != expected_name:
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=name_mismatch "
-            f"returned_name={result['name']!r}"
-        )
-        raise ValueError("AI response name mismatch")
+    print(
+        f"OPENROUTER RESPONSE STRUCTURE "
+        f"name={name} uuid={uuid} "
+        f"top_level_keys={list(data.keys())}",
+        file=sys.stderr,
+    )
 
-    valid_confidences = {
-        "high",
-        "medium",
-        "review",
-        "unknown",
-    }
+    choices = data.get("choices")
 
-    if result["confidence"] not in valid_confidences:
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=invalid_confidence "
-            f"value={result['confidence']!r}"
-        )
-        raise ValueError("Invalid confidence")
-
-    valid_statuses = {
-        "verified",
-        "review",
-        "unknown",
-    }
-
-    if result["status"] not in valid_statuses:
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=invalid_status "
-            f"value={result['status']!r}"
-        )
-        raise ValueError("Invalid status")
-
-    if not isinstance(result["reading"], str):
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=reading_not_string"
-        )
-        raise ValueError("reading must be a string")
-
-    if not isinstance(result["source"], str):
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=source_not_string"
-        )
-        raise ValueError("source must be a string")
-
-    if not isinstance(result["source_type"], str):
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=source_type_not_string"
-        )
-        raise ValueError("source_type must be a string")
-
-    if not isinstance(result["notes"], str):
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=notes_not_string"
-        )
-        raise ValueError("notes must be a string")
-
-    reading = result["reading"].strip()
-    source = result["source"].strip()
-
-    if result["status"] in {"verified", "review"}:
-        if not reading:
-            log(
-                f"AI RESPONSE VALIDATION ERROR "
-                f"name={expected_name} "
-                "error_type=empty_reading_for_non_unknown_status "
-                f"status={result['status']}"
-            )
-            raise ValueError(
-                "verified/review requires a non-empty reading"
-            )
-
-    if result["confidence"] in {
-        "high",
-        "medium",
-        "review",
-    } and not source:
-        log(
-            f"AI RESPONSE VALIDATION ERROR "
-            f"name={expected_name} "
-            "error_type=missing_source_for_confidence "
-            f"confidence={result['confidence']}"
-        )
+    if not isinstance(choices, list) or not choices:
         raise ValueError(
-            "Non-unknown confidence requires a source"
+            "OpenRouter response contains no choices"
         )
 
-    if result["status"] == "unknown":
-        if reading:
-            log(
-                f"AI RESPONSE VALIDATION ERROR "
-                f"name={expected_name} "
-                "error_type=unknown_with_nonempty_reading"
-            )
-            raise ValueError(
-                "unknown status must have an empty reading"
-            )
-
-    if result["status"] == "verified":
-        if result["confidence"] == "unknown":
-            log(
-                f"AI RESPONSE VALIDATION ERROR "
-                f"name={expected_name} "
-                "error_type=verified_with_unknown_confidence"
-            )
-            raise ValueError(
-                "verified cannot use unknown confidence"
-            )
-
-    if result["status"] == "review":
-        if result["confidence"] == "unknown":
-            log(
-                f"AI RESPONSE VALIDATION ERROR "
-                f"name={expected_name} "
-                "error_type=review_with_unknown_confidence"
-            )
-            raise ValueError(
-                "review cannot use unknown confidence"
-            )
-
-    log(
-        f"AI RESPONSE PARSED "
-        f"name={expected_name} "
-        f"status={result['status']} "
-        f"confidence={result['confidence']} "
-        f"reading_present={bool(reading)} "
-        f"source_present={bool(source)}"
+    print(
+        f"OPENROUTER CHOICES "
+        f"name={name} uuid={uuid} "
+        f"count={len(choices)}",
+        file=sys.stderr,
     )
 
-    return result
+    message = choices[0].get("message")
 
-
-def readings_path() -> Path:
-    """Return path to vtuber-readings.json."""
-    return (
-        Path(__file__).resolve().parent.parent
-        / "source"
-        / "vtuber-readings.json"
-    )
-
-
-def load_readings() -> list:
-    """Load the current readings result file."""
-    path = readings_path()
-
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
-    except FileNotFoundError:
-        return []
-
-    except json.JSONDecodeError as e:
-        log(
-            f"ERROR: Invalid JSON in {path}: "
-            f"line={e.lineno} column={e.colno} message={e.msg}"
-        )
-        raise
-
-    if not isinstance(data, list):
+    if not isinstance(message, dict):
         raise ValueError(
-            f"{path} must contain a JSON array"
+            "OpenRouter response contains no message"
         )
 
-    return data
-
-
-def write_readings(new_list: list) -> None:
-    """Write the complete readings result file."""
-    path = readings_path()
-
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(
-            new_list,
-            f,
-            ensure_ascii=False,
-            indent=2,
-        )
-        f.write("\n")
-
-
-def save_result(
-    uuid: str,
-    name_jp: str,
-    ai_result: dict,
-) -> bool:
-    """
-    Save or update a successful research result.
-
-    Existing verified/review/unknown records are protected.
-
-    Returns:
-        True  = new result written
-        False = existing successful result protected
-    """
-    now = utc_now()
-
-    record = {
-        "uuid": uuid,
-        "name": name_jp,
-        "reading": ai_result["reading"].strip(),
-        "source": ai_result["source"].strip(),
-        "source_type": ai_result["source_type"].strip(),
-        "confidence": ai_result["confidence"],
-        "status": ai_result["status"],
-        "notes": ai_result.get("notes", "").strip(),
-        "checked_at": now,
-    }
-
-    readings = load_readings()
-
-    protected_statuses = {
-        "verified",
-        "review",
-        "unknown",
-    }
-
-    for i, existing in enumerate(readings):
-        if existing.get("uuid") != uuid:
-            continue
-
-        if existing.get("status") in protected_statuses:
-            log(
-                f"RESULT SAVE SKIPPED "
-                f"name={name_jp} uuid={uuid} "
-                f"reason=existing_successful_status "
-                f"status={existing.get('status')}"
-            )
-            return False
-
-        readings[i] = record
-        write_readings(readings)
-
-        log(
-            f"RESULT SAVED "
-            f"name={name_jp} uuid={uuid} "
-            f"status={record['status']} "
-            f"confidence={record['confidence']}"
-        )
-
-        return True
-
-    readings.append(record)
-    write_readings(readings)
-
-    log(
-        f"RESULT SAVED "
-        f"name={name_jp} uuid={uuid} "
-        f"status={record['status']} "
-        f"confidence={record['confidence']}"
+    print(
+        f"OPENROUTER MESSAGE FOUND "
+        f"name={name} uuid={uuid} "
+        f"message_keys={list(message.keys())}",
+        file=sys.stderr,
     )
 
-    return True
+    content = message.get("content")
 
-
-def save_failure_state(
-    uuid: str,
-    name_jp: str,
-) -> None:
-    """
-    Save only the minimal technical failure state.
-
-    Never store detailed exception information, stderr, AI response,
-    HTTP response, or API credentials in the result file.
-    """
-    now = utc_now()
-
-    fail_record = {
-        "uuid": uuid,
-        "name": name_jp,
-        "reading": "",
-        "source": "",
-        "source_type": "",
-        "confidence": "unknown",
-        "status": "pending",
-        "notes": "",
-        "checked_at": "",
-        "last_attempted_at": now,
-        "last_attempt_result": "error",
-    }
-
-    readings = load_readings()
-
-    protected_statuses = {
-        "verified",
-        "review",
-        "unknown",
-    }
-
-    for i, existing in enumerate(readings):
-        if existing.get("uuid") != uuid:
-            continue
-
-        if existing.get("status") in protected_statuses:
-            log(
-                f"FAILURE STATE NOT SAVED OVER SUCCESS "
-                f"name={name_jp} uuid={uuid} "
-                f"existing_status={existing.get('status')}"
-            )
-            return
-
-        readings[i] = fail_record
-        write_readings(readings)
-
-        log(
-            f"FAILURE STATE SAVED "
-            f"name={name_jp} uuid={uuid} "
-            "status=pending last_attempt_result=error"
+    if not isinstance(content, str):
+        raise ValueError(
+            "OpenRouter message content is not a string"
         )
-        return
 
-    readings.append(fail_record)
-    write_readings(readings)
-
-    log(
-        f"FAILURE STATE SAVED "
-        f"name={name_jp} uuid={uuid} "
-        "status=pending last_attempt_result=error"
+    print(
+        f"OPENROUTER AI CONTENT RECEIVED "
+        f"name={name} uuid={uuid} "
+        f"content_length={len(content)}",
+        file=sys.stderr,
     )
 
-
-def fail_with_state(
-    uuid: str,
-    name_jp: str,
-    error_type: str,
-    exception: Optional[Exception] = None,
-) -> None:
-    """Log a technical failure, save minimal state, and exit."""
-    if exception is not None:
-        log(
-            f"RESEARCH FAILED "
-            f"name={name_jp} uuid={uuid} "
-            f"error_type={error_type} "
-            f"exception_type={type(exception).__name__} "
-            f"message={preview_text(str(exception))}"
-        )
-    else:
-        log(
-            f"RESEARCH FAILED "
-            f"name={name_jp} uuid={uuid} "
-            f"error_type={error_type}"
-        )
-
-    try:
-        save_failure_state(
-            uuid,
-            name_jp,
-        )
-    except Exception as save_error:
-        log(
-            f"FAILURE STATE SAVE ERROR "
-            f"name={name_jp} uuid={uuid} "
-            f"error_type={type(save_error).__name__} "
-            f"message={preview_text(str(save_error))}"
-        )
-
-    sys.exit(1)
+    return content
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
-        log(
-            "ERROR: UUID must be provided as a command-line argument"
+def main():
+    if len(sys.argv) != 2:
+        print(
+            "Usage: python scripts/research_one_vtuber.py <uuid>",
+            file=sys.stderr,
         )
-        sys.exit(1)
+        return 1
 
     uuid = sys.argv[1]
 
-    script_dir = Path(__file__).resolve().parent.parent
-    vdb_file = script_dir / "source" / "vdb.json"
+    print(
+        "RESEARCH START",
+        file=sys.stderr,
+    )
+    print(
+        f"uuid={uuid}",
+        file=sys.stderr,
+    )
 
-    log("")
-    log("RESEARCH START")
-    log(f"uuid={uuid}")
-
-    # ------------------------------------------------------------
-    # Load VDB
-    # ------------------------------------------------------------
     try:
-        vdb_data = load_json_file(str(vdb_file))
-
-    except SystemExit:
-        raise
-
-    except Exception as e:
-        log(
+        vdb = load_json(VDB_PATH)
+    except Exception as exc:
+        print(
             f"RESEARCH FAILED "
-            f"uuid={uuid} "
-            "error_type=vdb_load_error"
+            f"name=UNKNOWN uuid={uuid} "
+            f"error_type=vdb_load_error "
+            f"message={exc}",
+            file=sys.stderr,
         )
-        sys.exit(1)
+        return 1
 
-    entry = find_vdb_entry_by_uuid(
-        vdb_data,
-        uuid,
+    record = find_vtuber(vdb, uuid)
+
+    if record is None:
+        print(
+            f"RESEARCH FAILED "
+            f"name=UNKNOWN uuid={uuid} "
+            f"error_type=vtuber_not_found",
+            file=sys.stderr,
+        )
+        return 1
+
+    name = get_japanese_name(record)
+
+    if not name:
+        print(
+            f"RESEARCH FAILED "
+            f"name={name} uuid={uuid} "
+            f"error_type=missing_japanese_name",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(
+        f"RESEARCH TARGET name={name} uuid={uuid}",
+        file=sys.stderr,
     )
 
-    if not entry:
-        log(
-            f"RESEARCH FAILED "
-            f"uuid={uuid} "
-            "error_type=uuid_not_found_in_vdb"
-        )
-        sys.exit(1)
+    prompt = build_research_prompt(record)
 
-    # ------------------------------------------------------------
-    # Extract name.jp
-    # ------------------------------------------------------------
-    name_obj = entry.get("name", {})
-
-    if not isinstance(name_obj, dict):
-        log(
-            f"RESEARCH FAILED "
-            f"uuid={uuid} "
-            "error_type=invalid_name_object"
-        )
-        sys.exit(1)
-
-    name_jp = name_obj.get("jp")
-
-    if not isinstance(name_jp, str) or not name_jp.strip():
-        log(
-            f"RESEARCH FAILED "
-            f"uuid={uuid} "
-            "error_type=name_jp_missing_or_empty"
-        )
-        sys.exit(1)
-
-    name_jp = name_jp.strip()
-
-    log(
-        f"RESEARCH TARGET "
-        f"name={name_jp} uuid={uuid}"
-    )
-
-    # ------------------------------------------------------------
-    # Build research prompt
-    # ------------------------------------------------------------
-    aux_info = build_auxiliary_info(entry)
-
-    prompt = build_research_prompt(
-        name_jp,
-        uuid,
-        entry,
-        aux_info,
-    )
-
-    log(
+    print(
         f"RESEARCH PROMPT READY "
-        f"name={name_jp} uuid={uuid} "
-        f"prompt_length={len(prompt)}"
+        f"name={name} uuid={uuid} "
+        f"prompt_length={len(prompt)}",
+        file=sys.stderr,
     )
 
-    # ------------------------------------------------------------
-    # OpenRouter
-    # ------------------------------------------------------------
+    checked_at = utc_now()
+
     try:
-        ai_response = call_openrouter_api(
-            prompt,
-            name_jp,
-            uuid,
+        content = call_openrouter(
+            prompt=prompt,
+            uuid=uuid,
+            name=name,
         )
 
-    except requests.exceptions.Timeout as e:
-        fail_with_state(
-            uuid,
-            name_jp,
-            "openrouter_timeout",
-            e,
+        print(
+            f"AI RESPONSE RECEIVED "
+            f"name={name} "
+            f"content_length={len(content)}",
+            file=sys.stderr,
         )
 
-    except requests.exceptions.ConnectionError as e:
-        fail_with_state(
-            uuid,
-            name_jp,
-            "openrouter_connection_error",
-            e,
+        result = extract_json_object(content)
+
+        if result is None:
+            print(
+                f"AI RESPONSE PARSE FAILED "
+                f"name={name} "
+                f"error_type=invalid_json",
+                file=sys.stderr,
+            )
+
+            print(
+                "AI RESPONSE START PREVIEW: "
+                + content[:500],
+                file=sys.stderr,
+            )
+
+            print(
+                "AI RESPONSE END PREVIEW: "
+                + content[-500:],
+                file=sys.stderr,
+            )
+
+            raise ValueError(
+                "Failed to parse AI response as a JSON object"
+            )
+
+        result = validate_result(
+            result=result,
+            expected_uuid=uuid,
+            expected_name=name,
         )
 
-    except requests.exceptions.HTTPError as e:
-        status_code = (
-            e.response.status_code
-            if e.response is not None
-            else None
+        print(
+            f"AI RESPONSE PARSED "
+            f"name={name} "
+            f"status={result['status']} "
+            f"confidence={result['confidence']} "
+            f"reading_present={bool(result['reading'])} "
+            f"source_present={bool(result['source'])}",
+            file=sys.stderr,
         )
 
-        fail_with_state(
-            uuid,
-            name_jp,
-            f"openrouter_http_error_{status_code}",
-            e,
-        )
+        result["checked_at"] = checked_at
 
-    except Exception as e:
-        fail_with_state(
-            uuid,
-            name_jp,
-            "openrouter_or_api_error",
-            e,
-        )
+        save_success_result(result)
 
-    # ------------------------------------------------------------
-    # Parse and validate AI response
-    # ------------------------------------------------------------
-    try:
-        result = parse_ai_response(
-            ai_response,
-            name_jp,
-        )
-
-    except json.JSONDecodeError as e:
-        fail_with_state(
-            uuid,
-            name_jp,
-            "ai_json_decode_error",
-            e,
-        )
-
-    except Exception as e:
-        fail_with_state(
-            uuid,
-            name_jp,
-            "ai_response_validation_error",
-            e,
-        )
-
-    # ------------------------------------------------------------
-    # Research outcome
-    # ------------------------------------------------------------
-    status = result["status"]
-    reading = result["reading"].strip()
-    confidence = result["confidence"]
-
-    if status == "unknown":
-        log("")
-        log(
-            f"RESEARCH COMPLETED: UNKNOWN "
-            f"name={name_jp} uuid={uuid}"
-        )
-        log(
-            f"reading_present={bool(reading)} "
-            f"confidence={confidence}"
-        )
-
-    else:
-        log("")
-        log(
+        print(
             f"RESEARCH SUCCESS "
-            f"name={name_jp} "
-            f"uuid={uuid} "
-            f"reading={reading} "
-            f"status={status} "
-            f"confidence={confidence}"
+            f"name={name} uuid={uuid} "
+            f"reading={result['reading']} "
+            f"status={result['status']} "
+            f"confidence={result['confidence']}",
+            file=sys.stderr,
         )
 
-    # ------------------------------------------------------------
-    # Save result
-    # ------------------------------------------------------------
-    try:
-        saved = save_result(
-            uuid,
-            name_jp,
-            result,
+        print(
+            f"RESULT SAVED "
+            f"name={name} uuid={uuid} "
+            f"status={result['status']} "
+            f"confidence={result['confidence']}",
+            file=sys.stderr,
         )
 
-    except Exception as e:
-        fail_with_state(
-            uuid,
-            name_jp,
-            "result_save_error",
-            e,
-        )
-
-    if not saved:
-        log(
-            f"RESEARCH COMPLETED: EXISTING RESULT PROTECTED "
-            f"name={name_jp} uuid={uuid}"
+        print(
+            f"RESEARCH FINISHED "
+            f"name={name} uuid={uuid} "
+            f"status={result['status']}",
+            file=sys.stderr,
         )
 
         print(
             json.dumps(
                 {
-                    "uuid": uuid,
-                    "name": name_jp,
-                    "reading": reading,
-                    "status": "skipped_existing_success",
+                    "uuid": result["uuid"],
+                    "name": result["name"],
+                    "reading": result["reading"],
+                    "status": result["status"],
+                    "confidence": result["confidence"],
+                    "checked_at": result["checked_at"],
                 },
                 ensure_ascii=False,
             )
         )
 
-        sys.exit(0)
+        return 0
 
-    # ------------------------------------------------------------
-    # Final machine-readable summary
-    # ------------------------------------------------------------
-    print(
-        json.dumps(
-            {
-                "uuid": uuid,
-                "name": name_jp,
-                "reading": reading,
-                "status": status,
-                "confidence": confidence,
-                "checked_at": utc_now(),
-            },
-            ensure_ascii=False,
+    except Exception as exc:
+        print(
+            f"RESEARCH FAILED "
+            f"name={name} uuid={uuid} "
+            f"error_type={type(exc).__name__} "
+            f"message={exc}",
+            file=sys.stderr,
         )
-    )
 
-    log("")
-    log(
-        f"RESEARCH FINISHED "
-        f"name={name_jp} uuid={uuid} "
-        f"status={status}"
-    )
+        try:
+            save_failure_state(
+                uuid=uuid,
+                name=name,
+            )
+        except Exception as save_exc:
+            print(
+                f"FAILURE STATE SAVE ERROR "
+                f"name={name} uuid={uuid} "
+                f"error_type={type(save_exc).__name__} "
+                f"message={save_exc}",
+                file=sys.stderr,
+            )
 
-    sys.exit(0)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
