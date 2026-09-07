@@ -170,9 +170,9 @@
     "source_type": "",
     "confidence": "unknown",
     "status": "pending",
-    "notes": "Searches for 'Eve SCP VTuber', 'Eve SCP イヴ', and related queries returned no reliable Japanese-language information establishing a Japanese reading for this specific VTuber. Results are dominated by the SCP Foundation 'SCP-EVE' entry, unrelated English-language SCP content, and the more prominent Japanese singer-songwriter 'Eve' (イヴ), none of which confirm a reading for 'Eve SCP' as a distinct VTuber.",
-    "checked_at": "2026-09-07T12:07:01Z",
-    "last_attempted_at": "2026-09-07T12:07:01Z",
+    "notes": "",
+    "checked_at": "2026-09-07T13:30:15Z",
+    "last_attempted_at": "2026-09-07T13:30:15Z",
     "last_attempt_result": "success"
   },
   {
@@ -209,9 +209,9 @@
     "source_type": "",
     "confidence": "unknown",
     "status": "pending",
-    "notes": "Bilibili VTuber (UID 2008705943) affiliated with melody事务所. No reliable Japanese-language source (official, Wikipedia, VTuber database, or media) establishes a Japanese reading for this specific VTuber. The Chinese characters 多宇 as a standalone Japanese surname can be read 'たう' (tau), but 'Jinlly' is in Roman letters and there is no confirmed Japanese pronunciation for this specific VTuber's full name.",
-    "checked_at": "2026-09-07T12:47:48Z",
-    "last_attempted_at": "2026-09-07T12:47:48Z",
+    "notes": "Bilibili-based VUP (uid 2008705943) under melody事务所 guild. Name mixes Latin (Jinlly, Official) and Chinese characters (多宇). No Wikipedia, official page, or established VTuber database provides a Japanese reading for this entity. Generic kanji name dictionaries give 多宇 as 'たう', but this is a surname reading unrelated to the VTuber's own pronunciation. No reliable Japanese reading can be established.",
+    "checked_at": "2026-09-07T13:33:37Z",
+    "last_attempted_at": "2026-09-07T13:33:37Z",
     "last_attempt_result": "success"
   },
   {
@@ -465,9 +465,9 @@
     "source_type": "",
     "confidence": "unknown",
     "status": "pending",
-    "notes": "No reliable Japanese reading could be established for this VTuber name.",
-    "checked_at": "2026-09-07T12:54:50Z",
-    "last_attempted_at": "2026-09-07T12:54:50Z",
+    "notes": "No reliable source found identifying this VTuber or its reading. Searches for the name '魚見音凅' returned no relevant results in VTuber databases, official channels, Wikipedia, or established Japanese media.",
+    "checked_at": "2026-09-07T13:40:01Z",
+    "last_attempted_at": "2026-09-07T13:40:01Z",
     "last_attempt_result": "success"
   },
   {
@@ -564,41 +564,41 @@
   {
     "uuid": "34fb46e8-954f-5de2-b8c0-e0d9296f46d6",
     "name": "羽月奏ちゆ",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:06:26Z",
-    "last_attempted_at": "2026-09-07T07:06:26Z",
-    "last_attempt_result": ""
+    "reading": "はつかちゆ",
+    "source": "Twitcasting profile @hatsuka_chiyu — self-description: 「ねずみっこ #新人Vtuber の #羽月奏ちゆ （はつかちゆ）です」; also v-data (https://v-data.info/v/SZj-Gx1NcIw70xsS) lists reading as はつかちゆ",
+    "source_type": "vtuber_database",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Self-introduction in the VTuber's own Twitcasting bio gives the reading in parentheses: 羽月奏ちゆ（はつかちゆ）. v-data database (a Japanese VTuber database) likewise records the reading as はつかちゆ. Twitter handle hatsuka_chiyu / FANBOX hatsukachiyu corroborate. Rooted in 八日(はつか) + 奏(かなで/そう) + ちゆ.",
+    "checked_at": "2026-09-07T13:41:19Z",
+    "last_attempted_at": "2026-09-07T13:41:19Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "809f2058-1687-5c62-a21b-cd8804036140",
     "name": "hololive DEV_IS FLOW GLOW",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:06:35Z",
-    "last_attempted_at": "2026-09-07T07:06:35Z",
-    "last_attempt_result": ""
+    "reading": "フロウ グロウ",
+    "source": "https://hololive.hololivepro.com/news/20241107-01-310/ - Official hololive website explicitly states 'FLOW GLOW（読み：フロウ グロウ）'",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Reading 'フロウ グロウ' (Furō Guro) is explicitly stated by the official hololive website and corroborated by COVER Corporation's official press release (prtimes.jp), Japanese Wikipedia, and multiple Japanese VTuber reference sources.",
+    "checked_at": "2026-09-07T13:41:51Z",
+    "last_attempted_at": "2026-09-07T13:41:51Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "36fa7fba-1bdd-5611-8148-af5b5420de26",
     "name": "狐井アキラ",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:06:36Z",
-    "last_attempted_at": "2026-09-07T07:06:36Z",
-    "last_attempt_result": ""
+    "reading": "きついあキラ",
+    "source": "Virtual YouTuber Wiki (Fandom) lists 'Original Name: 狐井アキラ (Kitsui Akira)'; VTuber database vtuber-live.net shows '名前: 狐井アキラ（きついあきら）'; YouTube handle @KitsuiAkira; self-introduction refers to herself as 'Kitsui Akira'",
+    "source_type": "vtuber_database",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Readingきついあキラ (Kitsui Akira) confirmed across the VTuber Wiki fandom page, the vtuber-live.net database, the VTuber's official YouTube channel handle (@KitsuiAkira), and her own self-introduction on her channel. Fan name 'Kitsuteers' is consistent with the 'Kitsui' reading.",
+    "checked_at": "2026-09-07T13:42:49Z",
+    "last_attempted_at": "2026-09-07T13:42:49Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "3d215dcc-747b-55da-a9a6-0a082a7a7976",
@@ -632,12 +632,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:07:23Z",
-    "last_attempted_at": "2026-09-07T07:07:23Z",
-    "last_attempt_result": ""
+    "notes": "No reliable source found that establishes a Japanese pronunciation for this exact VTuber name/UUID. Search results surfaced several similarly-named accounts (Mikorinn/mikorinnm on Bluesky, みこりん VTubers, MikorinVT, MiKori) but none can be verifiably matched to the target UUID f622f184-6765-5919-86c9-9e0bee0bb038.",
+    "checked_at": "2026-09-07T13:43:05Z",
+    "last_attempted_at": "2026-09-07T13:43:05Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "c4099b8a-89a8-5bf3-98e9-3559b7dcc688",
@@ -694,41 +694,41 @@
   {
     "uuid": "4e16ae28-14cf-5a2d-8c31-be3cc6fbd3a5",
     "name": "あさひなゆうひ",
-    "reading": "",
-    "source": "",
-    "source_type": "",
+    "reading": "あさひなゆうひ",
+    "source": "deterministic:kana-only",
+    "source_type": "other",
     "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:08:15Z",
-    "last_attempted_at": "2026-09-07T07:08:15Z",
-    "last_attempt_result": ""
+    "status": "verified",
+    "notes": "name.jp is kana-only; reading was generated by deterministic kana conversion. Middle dot was not read.",
+    "checked_at": "2026-09-07T13:43:05Z",
+    "last_attempted_at": "2026-09-07T13:43:05Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "f0ed9112-1ef6-54b1-89f4-9d73d36ccde3",
     "name": "あらちゃofficial",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:58:40Z",
-    "last_attempted_at": "2026-09-07T07:58:40Z",
-    "last_attempt_result": ""
+    "reading": "あらちゃ",
+    "source": "VTuber's own self-introduction: \"あらいぐまの精霊、あらちゃです\" and greeting \"こんあら！\" on Ci-en profile and YouTube channel description",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Reading confirmed across official channels (Ci-en profile, YouTube channel 'あらちゃ Aratya Ch', TuneCore listing 'あらちゃ | Aracha'). The VTuber self-identifies as あらちゃ (Aratya/Aracha), a raccoon spirit (あらいぐまの精霊). Greeting 'こんあら！' is a pun on こんにちは.",
+    "checked_at": "2026-09-07T13:43:34Z",
+    "last_attempted_at": "2026-09-07T13:43:34Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "96f0c442-60ea-58ec-911b-16148f3c497e",
     "name": "いるはーと",
-    "reading": "",
-    "source": "",
-    "source_type": "",
+    "reading": "いるはーと",
+    "source": "deterministic:kana-only",
+    "source_type": "other",
     "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T07:58:42Z",
-    "last_attempted_at": "2026-09-07T07:58:42Z",
-    "last_attempt_result": ""
+    "status": "verified",
+    "notes": "name.jp is kana-only; reading was generated by deterministic kana conversion. Middle dot was not read.",
+    "checked_at": "2026-09-07T13:43:34Z",
+    "last_attempted_at": "2026-09-07T13:43:34Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "bbfb24ed-403d-57bb-8e9f-11ab14cdca8e",
@@ -746,15 +746,15 @@
   {
     "uuid": "5033b210-817c-54d5-8275-dbff83b40739",
     "name": "えま★おうがすと",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T08:00:58Z",
-    "last_attempted_at": "2026-09-07T08:00:58Z",
-    "last_attempt_result": ""
+    "reading": "えま おうがすと",
+    "source": "https://www.nijisanji.jp/talents/l/emma-august",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "The official Nijisanji talent page displays the reading explicitly as 'えま おうがすと'. The English name is Emma★August, confirming 'えま' = Emma and 'おうがすと' = August. The Nijisanji Wiki also lists the reading as 'えまおうがすと' in its page title. Multiple secondary sources (YouTube, VTuber-ch.com) consistently use this reading.",
+    "checked_at": "2026-09-07T13:45:24Z",
+    "last_attempted_at": "2026-09-07T13:45:24Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "92fe06eb-2237-54a6-ab1c-2424f6ca699a",
@@ -788,25 +788,25 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T08:01:29Z",
-    "last_attempted_at": "2026-09-07T08:01:29Z",
-    "last_attempt_result": ""
+    "notes": "No reliable source found establishing the Japanese reading of this exact VTuber name.",
+    "checked_at": "2026-09-07T13:46:30Z",
+    "last_attempted_at": "2026-09-07T13:46:30Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "efff9f3d-7687-5565-97b3-b52d30c1f344",
     "name": "おさナズナ",
-    "reading": "",
-    "source": "",
-    "source_type": "",
+    "reading": "おさなずな",
+    "source": "deterministic:kana-only",
+    "source_type": "other",
     "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T08:01:33Z",
-    "last_attempted_at": "2026-09-07T08:01:33Z",
-    "last_attempt_result": ""
+    "status": "verified",
+    "notes": "name.jp is kana-only; reading was generated by deterministic kana conversion. Middle dot was not read.",
+    "checked_at": "2026-09-07T13:46:30Z",
+    "last_attempted_at": "2026-09-07T13:46:30Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "7f44a8c6-834f-5dab-8496-c5cdf4fb57f7",
@@ -824,15 +824,15 @@
   {
     "uuid": "338ed8b2-3593-54e6-90d8-f7ef9d77837d",
     "name": "お子ASMR-OCO",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T08:01:39Z",
-    "last_attempted_at": "2026-09-07T08:01:39Z",
-    "last_attempt_result": ""
+    "reading": "おこ",
+    "source": "https://avtuber.info/index.php/%E3%81%8A%E5%AD%90",
+    "source_type": "vtuber_database",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "AVTuber Wiki explicitly lists 読み as 'おこ'. The target name 'お子ASMR-OCO' corresponds to the VTuber お子₀₅ (display name) belonging to はーどもーど百合むすめ（はもゆり）, YouTube channel UCQtohfgViAqHGMOf1nwaeJQ, with fan-related tags (おこなま, おこぱれっと, おこみて) and fan name (おこりす) consistently supporting the 'おこ' reading.",
+    "checked_at": "2026-09-07T13:47:34Z",
+    "last_attempted_at": "2026-09-07T13:47:34Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "260da5f4-b731-58e5-9e03-b745d468bc72",
@@ -876,15 +876,15 @@
   {
     "uuid": "3e9f1fa6-90f0-55c5-b906-c69230c64311",
     "name": "くもの上ユメミ",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T08:23:22Z",
-    "last_attempted_at": "2026-09-07T08:23:22Z",
-    "last_attempt_result": ""
+    "reading": "くものうえ ゆめみ",
+    "source": "くもの上ユメミ非公式Wiki よくある質問ページ (https://wikiwiki.jp/yumemi/%E3%82%88%E3%81%8F%E3%81%82%E3%82%8B%E8%B3%AA%E5%95%8F) and VTuber's official Twitter @Kumonoue_Yumemi",
+    "source_type": "vtuber_database",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Reading explicitly stated as 'くものうえ ゆめみ' on the unofficial Wiki FAQ page. Confirmed via Twitter handle @Kumonoue_Yumemi, Virtual YouTuber Fandom Wiki entry 'Kumonoue Yumemi', and vtuber-live.net database.",
+    "checked_at": "2026-09-07T13:47:42Z",
+    "last_attempted_at": "2026-09-07T13:47:42Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "27e8a966-6d27-52f7-a14d-4ad8328c6e7b",
@@ -1061,12 +1061,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T08:24:22Z",
-    "last_attempted_at": "2026-09-07T08:24:22Z",
-    "last_attempt_result": ""
+    "notes": "No reliable evidence found for the Japanese pronunciation of this exact VTuber name. The name uses kanji 幽灵 (Chinese for 'ghost/spirit') rather than the usual Japanese 幽霊, suggesting a possible Chinese-origin account. Unable to verify reading from official or established sources.",
+    "checked_at": "2026-09-07T13:49:15Z",
+    "last_attempted_at": "2026-09-07T13:49:15Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "8d0f9327-1b69-553f-8f2c-0ec589b9e51e",
@@ -1266,15 +1266,15 @@
   {
     "uuid": "e2e4b277-8535-5a96-8002-3a6ad7253f1d",
     "name": "まりなす（仮）",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T09:02:00Z",
-    "last_attempted_at": "2026-09-07T09:02:00Z",
-    "last_attempt_result": ""
+    "reading": "まりなす",
+    "source": "https://ja.wikipedia.org/wiki/%E3%81%BE%E3%82%8A%E3%81%AA%E3%81%99",
+    "source_type": "wikipedia",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Unit name 'まりなす' is confirmed via official Avex site URL (avex.jp/marinasu/) and Wikipedia. The former name 'まりなす（仮）' was changed to 'まりなす' in 2021 when the unit 'graduated' from the provisional designation. Reading is the same: まりなす.",
+    "checked_at": "2026-09-07T13:49:55Z",
+    "last_attempted_at": "2026-09-07T13:49:55Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "7d225ab7-a3be-5226-a7c4-fa750472f741",
@@ -1350,9 +1350,9 @@
     "confidence": "",
     "status": "pending",
     "notes": "",
-    "checked_at": "2026-09-07T09:02:02Z",
-    "last_attempted_at": "2026-09-07T09:02:02Z",
-    "last_attempt_result": ""
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T13:49:55Z",
+    "last_attempt_result": "technical_error"
   },
   {
     "uuid": "7a6c02ee-d96f-5f4b-880e-79375de2c3c7",
@@ -1396,15 +1396,15 @@
   {
     "uuid": "440115ab-ce45-545c-90d1-bfbb04010474",
     "name": "りんうらん霖雨蘭",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T09:02:44Z",
-    "last_attempted_at": "2026-09-07T09:02:44Z",
-    "last_attempt_result": ""
+    "reading": "りんうらん",
+    "source": "Bilibili personal space (space.bilibili.com/34815578) and NGA thread title showing romaji 'Rinuran' with hiragana 'りんうらん'",
+    "source_type": "other",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "The name is consistently rendered with the hiragana reading りんうらん (Rinuran) on Bilibili and NGA. The kanji 霖雨蘭 is the Chinese character form of the same name; the Japanese reading is りんうらん.",
+    "checked_at": "2026-09-07T13:52:27Z",
+    "last_attempted_at": "2026-09-07T13:52:27Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "5b4dba56-b157-5527-89b2-f17462a72321",
@@ -1737,12 +1737,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T09:05:45Z",
-    "last_attempted_at": "2026-09-07T09:05:45Z",
-    "last_attempt_result": ""
+    "notes": "Could not locate a reliable official or database source confirming the Japanese reading for this exact VTuber (Bilibili mid 34612975, name ゴミOfficial). Katakana ゴミ would typically be read as ごみ (gomi) but no authoritative source was found for this specific VTuber.",
+    "checked_at": "2026-09-07T13:55:35Z",
+    "last_attempted_at": "2026-09-07T13:55:35Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "7d010d47-a9e5-5ca0-a015-bba41bba4453",
@@ -1799,15 +1799,15 @@
   {
     "uuid": "65bfc16b-787e-534d-82ed-ab7a201b88b3",
     "name": "ジョー・力一",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T09:05:47Z",
-    "last_attempted_at": "2026-09-07T09:05:47Z",
-    "last_attempt_result": ""
+    "reading": "じょー りきいち",
+    "source": "https://www.nijisanji.jp/talents/l/joe-rikiichi (official Nijisanji talent page) and https://ja.wikipedia.org/wiki/%E3%82%B8%E3%83%A7%E3%83%BC%E3%83%BB%E5%8A%9B%E4%B8%80",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Reading 'じょー りきいち' is confirmed by the official Nijisanji talent profile, Japanese Wikipedia, Animate Times profile, Nijisanji Wiki*, and the VTuber's own self-introduction video where he says 'ジョー・力一(りきいち)'.",
+    "checked_at": "2026-09-07T13:55:54Z",
+    "last_attempted_at": "2026-09-07T13:55:54Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "93f44497-1c55-54fc-82f4-e959ba505367",
@@ -1857,9 +1857,9 @@
     "confidence": "",
     "status": "pending",
     "notes": "",
-    "checked_at": "2026-09-07T09:06:42Z",
-    "last_attempted_at": "2026-09-07T09:06:42Z",
-    "last_attempt_result": ""
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T13:55:54Z",
+    "last_attempt_result": "technical_error"
   },
   {
     "uuid": "d150c9e8-a4de-559f-a9d3-10b514a701fe",
@@ -1896,9 +1896,9 @@
     "confidence": "",
     "status": "pending",
     "notes": "",
-    "checked_at": "2026-09-07T09:33:28Z",
-    "last_attempted_at": "2026-09-07T09:33:28Z",
-    "last_attempt_result": ""
+    "checked_at": "",
+    "last_attempted_at": "2026-09-07T13:59:21Z",
+    "last_attempt_result": "technical_error"
   },
   {
     "uuid": "ad9596b2-7953-539f-a708-b68f281e3b7a",
@@ -2267,28 +2267,28 @@
   {
     "uuid": "f6e1d318-29f6-59c8-abd7-3bfc10928301",
     "name": "ロボ子さん",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T10:06:48Z",
-    "last_attempted_at": "2026-09-07T10:06:48Z",
-    "last_attempt_result": ""
+    "reading": "ロボこさん",
+    "source": "https://ja.wikipedia.org/wiki/%E3%83%AD%E3%83%9C%E5%AD%90%E3%81%95%E3%82%93",
+    "source_type": "wikipedia",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Japanese Wikipedia article on ロボ子さん opens with the reading ロボこさん (Robocosan). The VTuber-Arch database (vtuber-arch.com) also lists the name with furigana as ろぼこさん. The official hololive talent page (hololive.hololivepro.com/talents/roboco-san/) identifies this VTuber as 'ロボ子さん Robocosan'.",
+    "checked_at": "2026-09-07T14:02:55Z",
+    "last_attempted_at": "2026-09-07T14:02:55Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "ecf90698-b888-5f77-ba84-8bec2642d728",
     "name": "ヰ世界情緒",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T10:07:02Z",
-    "last_attempted_at": "2026-09-07T10:07:02Z",
-    "last_attempt_result": ""
+    "reading": "いせかいじょうちょ",
+    "source": "orie (character designer) on X (Twitter), 2019-10-18: 「いせかいじょうちょって読みます」; corroborated by Wikipedia (ja.wikipedia.org/wiki/ヰ世界情緒) and other references (wikid.org, otakumania.jp) which all give the reading いせかいじょうちょ.",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
+    "notes": "Reading is explicitly stated by the official character designer orie and confirmed by the character's own official social media (e.g., @isekaijoucho on X). The character is affiliated with KAMITSUBAKI STUDIO. Romanized form: Isekaijoucho.",
+    "checked_at": "2026-09-07T14:03:15Z",
+    "last_attempted_at": "2026-09-07T14:03:15Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "a743598f-a100-506d-83a6-c0eefc6a2c7b",
@@ -2319,15 +2319,15 @@
   {
     "uuid": "6ab81584-fa13-5ee8-a8ff-10eada328f3e",
     "name": "七彩てまり",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "",
-    "status": "pending",
+    "reading": "なないろ てまり",
+    "source": "https://haconect.com/news/193 (七彩てまり（なないろ てまり）)",
+    "source_type": "official",
+    "confidence": "high",
+    "status": "verified",
     "notes": "",
-    "checked_at": "2026-09-07T10:07:45Z",
-    "last_attempted_at": "2026-09-07T10:07:45Z",
-    "last_attempt_result": ""
+    "checked_at": "2026-09-07T14:03:30Z",
+    "last_attempted_at": "2026-09-07T14:03:30Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "1b50e187-bc9e-5c7d-b9ec-733abfda3cd2",
@@ -2335,12 +2335,12 @@
     "reading": "",
     "source": "",
     "source_type": "",
-    "confidence": "",
+    "confidence": "unknown",
     "status": "pending",
-    "notes": "",
-    "checked_at": "2026-09-07T10:07:47Z",
-    "last_attempted_at": "2026-09-07T10:07:47Z",
-    "last_attempt_result": ""
+    "notes": "Unable to establish a reliable reading for this exact VTuber.",
+    "checked_at": "2026-09-07T14:03:32Z",
+    "last_attempted_at": "2026-09-07T14:03:32Z",
+    "last_attempt_result": "success"
   },
   {
     "uuid": "430ce05a-7c63-56de-92b8-21944fa2531e",
