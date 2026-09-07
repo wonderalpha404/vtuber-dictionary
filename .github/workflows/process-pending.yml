@@ -43,16 +43,15 @@ jobs:
           echo "Diff name-only:"
           git --no-pager diff --name-only || true
 
-      - name: Commit and push changes if only sample file changed
+      - name: Commit and push changes if vtuber-readings.json changed
         run: |
-          # Collect changed files (including untracked)
           CHANGED_FILES=$(git status --porcelain | cut -c4- | sed '/^$/d' | tr '\n' ' ')
           if [ -z "$CHANGED_FILES" ]; then
             echo "No changes to commit."
             exit 0
           fi
           echo "Changed files: $CHANGED_FILES"
-          ALLOWED="source/sample-10-jp.json"
+          ALLOWED="source/vtuber-readings.json"
           for f in $CHANGED_FILES; do
             if [ "$f" != "$ALLOWED" ]; then
               echo "Aborting push: unexpected modified file: $f"
@@ -62,6 +61,6 @@ jobs:
           done
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add source/sample-10-jp.json
-          git commit -m "Process pending: ran research for up to ${{ inputs.count }} items" || echo "Nothing to commit"
+          git add source/vtuber-readings.json
+          git commit -m "Update vtuber readings: batch processed up to ${{ inputs.count }} items" || echo "Nothing to commit"
           git push
