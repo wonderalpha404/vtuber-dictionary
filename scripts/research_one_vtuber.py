@@ -776,17 +776,56 @@ def research(uuid, name):
 
         return 1
 
-
 def main():
-    if len(sys.argv) != 3:
+    """
+    Support both invocation styles:
+
+    1. Positional:
+       python scripts/research_one_vtuber.py <uuid> <name>
+
+    2. Named arguments:
+       python scripts/research_one_vtuber.py --uuid <uuid> --name <name>
+
+    The second form is kept for compatibility with process_pending.py.
+    """
+
+    if len(sys.argv) == 3:
+        # Positional arguments:
+        # research_one_vtuber.py <uuid> <name>
+        uuid = sys.argv[1]
+        name = sys.argv[2]
+
+    elif len(sys.argv) == 5:
+        # Named arguments:
+        # research_one_vtuber.py --uuid <uuid> --name <name>
+        if sys.argv[1] != "--uuid" or sys.argv[3] != "--name":
+            print(
+                "Usage: python scripts/research_one_vtuber.py "
+                "<uuid> <name>",
+                file=sys.stderr,
+            )
+            print(
+                "   or: python scripts/research_one_vtuber.py "
+                "--uuid <uuid> --name <name>",
+                file=sys.stderr,
+            )
+            return 2
+
+        uuid = sys.argv[2]
+        name = sys.argv[4]
+
+    else:
         print(
-            "Usage: python scripts/research_one_vtuber.py <uuid> <name>",
+            "Usage: python scripts/research_one_vtuber.py "
+            "<uuid> <name>",
+            file=sys.stderr,
+        )
+        print(
+            "   or: python scripts/research_one_vtuber.py "
+            "--uuid <uuid> --name <name>",
             file=sys.stderr,
         )
         return 2
-
-    uuid = sys.argv[1]
-    name = sys.argv[2]
 
     return research(
         uuid=uuid,
