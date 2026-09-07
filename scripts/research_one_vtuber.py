@@ -40,7 +40,12 @@ def log(message):
     print(message, file=sys.stderr, flush=True)
 
 
-def make_failure_record(uuid, name, started_at):
+def make_failure_record(uuid, name, started_at, existing=None):
+    notes = ""
+
+    if isinstance(existing, dict):
+        notes = existing.get("notes", "")
+
     return {
         "uuid": uuid,
         "name": name,
@@ -49,7 +54,7 @@ def make_failure_record(uuid, name, started_at):
         "source_type": "",
         "confidence": "unknown",
         "status": "pending",
-        "notes": "",
+        "notes": notes,
         "checked_at": "",
         "last_attempted_at": started_at,
         "last_attempt_result": "error",
@@ -99,6 +104,16 @@ def upsert_result(record):
     save_results(results)
 
 
+def get_existing_result(uuid):
+    results = load_results()
+
+    for record in results:
+        if record.get("uuid") == uuid:
+            return record
+
+    return None
+
+
 def extract_json_object(text):
     """
     Extract a JSON object from the AI response.
@@ -119,7 +134,6 @@ def extract_json_object(text):
     if not text:
         raise ValueError("AI response content is empty")
 
-    # First: try the complete response directly.
     try:
         parsed = json.loads(text)
 
@@ -131,7 +145,6 @@ def extract_json_object(text):
     except json.JSONDecodeError:
         pass
 
-    # Second: remove Markdown code fences.
     fenced = re.search(
         r"```(?:json)?\s*(\{.*?\})\s*```",
         text,
@@ -152,7 +165,6 @@ def extract_json_object(text):
                 f"JSON code fence found but JSON is invalid: {exc}"
             ) from exc
 
-    # Third: find the first balanced JSON object.
     start = text.find("{")
 
     if start >= 0:
@@ -444,7 +456,6 @@ def validate_result(data, uuid, name):
             f"Invalid source_type: {data['source_type']!r}"
         )
 
-    # If a reading exists, it should normally have supporting evidence.
     if data["reading"] and not data["source"]:
         raise ValueError(
             "AI returned a reading without a supporting source"
@@ -504,6 +515,7 @@ def request_openrouter(uuid, name, prompt):
             json=payload,
             timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
         )
+
     except requests.exceptions.ConnectTimeout as exc:
         elapsed = time.monotonic() - started
 
@@ -564,6 +576,7 @@ def request_openrouter(uuid, name, prompt):
 
     try:
         data = response.json()
+
     except json.JSONDecodeError as exc:
         body_preview = response.text[:1000].replace("\n", "\\n")
 
@@ -721,6 +734,18 @@ def research(uuid, name):
             "last_attempt_result": "success",
         }
 
+        existing = get_existing_result(uuid)
+
+        if (
+            existing is not None
+            and existing.get("status") in ALLOWED_STATUS
+        ):
+            log(
+                f"EXISTING SUCCESS RESULT PROTECTED "
+                f"name={name} uuid={uuid} "
+                f"status={existing.get('status')}"
+            )
+
         upsert_result(result)
 
         log(
@@ -740,31 +765,58 @@ def research(uuid, name):
         return 0
 
     except Exception as exc:
-        failure = make_failure_record(
-            uuid=uuid,
-            name=name,
-            started_at=started_at,
-        )
+        existing = None
 
         try:
-            upsert_result(failure)
-
+            existing = get_existing_result(uuid)
+        except Exception as load_exc:
             log(
-                f"FAILURE STATE SAVED "
+                f"EXISTING RESULT LOAD FAILED "
                 f"name={name} "
                 f"uuid={uuid} "
-                f"status=pending "
-                f"last_attempt_result=error"
+                f"error_type={type(load_exc).__name__} "
+                f"message={load_exc}"
             )
 
-        except Exception as save_exc:
+        if (
+            existing is not None
+            and existing.get("status") in ALLOWED_STATUS
+            and existing.get("last_attempt_result") == "success"
+        ):
             log(
-                f"FAILURE STATE SAVE FAILED "
+                f"EXISTING SUCCESS RESULT NOT OVERWRITTEN "
                 f"name={name} "
                 f"uuid={uuid} "
-                f"error_type={type(save_exc).__name__} "
-                f"message={save_exc}"
+                f"status={existing.get('status')}"
             )
+
+        else:
+            failure = make_failure_record(
+                uuid=uuid,
+                name=name,
+                started_at=started_at,
+                existing=existing,
+            )
+
+            try:
+                upsert_result(failure)
+
+                log(
+                    f"FAILURE STATE SAVED "
+                    f"name={name} "
+                    f"uuid={uuid} "
+                    f"status=pending "
+                    f"last_attempt_result=error"
+                )
+
+            except Exception as save_exc:
+                log(
+                    f"FAILURE STATE SAVE FAILED "
+                    f"name={name} "
+                    f"uuid={uuid} "
+                    f"error_type={type(save_exc).__name__} "
+                    f"message={save_exc}"
+                )
 
         log(
             f"RESEARCH FAILED "
@@ -776,56 +828,17 @@ def research(uuid, name):
 
         return 1
 
+
 def main():
-    """
-    Support both invocation styles:
-
-    1. Positional:
-       python scripts/research_one_vtuber.py <uuid> <name>
-
-    2. Named arguments:
-       python scripts/research_one_vtuber.py --uuid <uuid> --name <name>
-
-    The second form is kept for compatibility with process_pending.py.
-    """
-
-    if len(sys.argv) == 3:
-        # Positional arguments:
-        # research_one_vtuber.py <uuid> <name>
-        uuid = sys.argv[1]
-        name = sys.argv[2]
-
-    elif len(sys.argv) == 5:
-        # Named arguments:
-        # research_one_vtuber.py --uuid <uuid> --name <name>
-        if sys.argv[1] != "--uuid" or sys.argv[3] != "--name":
-            print(
-                "Usage: python scripts/research_one_vtuber.py "
-                "<uuid> <name>",
-                file=sys.stderr,
-            )
-            print(
-                "   or: python scripts/research_one_vtuber.py "
-                "--uuid <uuid> --name <name>",
-                file=sys.stderr,
-            )
-            return 2
-
-        uuid = sys.argv[2]
-        name = sys.argv[4]
-
-    else:
+    if len(sys.argv) != 3:
         print(
-            "Usage: python scripts/research_one_vtuber.py "
-            "<uuid> <name>",
-            file=sys.stderr,
-        )
-        print(
-            "   or: python scripts/research_one_vtuber.py "
-            "--uuid <uuid> --name <name>",
+            "Usage: python scripts/research_one_vtuber.py <uuid> <name>",
             file=sys.stderr,
         )
         return 2
+
+    uuid = sys.argv[1]
+    name = sys.argv[2]
 
     return research(
         uuid=uuid,
