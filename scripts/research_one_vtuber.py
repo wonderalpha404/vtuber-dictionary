@@ -16,6 +16,9 @@ OPENROUTER_MODEL = "openrouter/free"
 CONNECT_TIMEOUT = 15
 READ_TIMEOUT = 60
 
+MAX_API_ATTEMPTS = 3
+RETRY_DELAYS = [30, 60]
+
 OUTPUT_FILE = "source/vtuber-readings.json"
 
 ALLOWED_STATUS = {"verified", "review", "unknown"}
@@ -464,7 +467,7 @@ def validate_result(data, uuid, name):
     return data
 
 
-def request_openrouter(uuid, name, prompt):
+def request_openrouter_once(uuid, name, prompt, attempt):
     api_key = os.environ.get("OPENROUTER_API_KEY")
 
     if not api_key:
@@ -498,13 +501,14 @@ def request_openrouter(uuid, name, prompt):
     log("OPENROUTER REQUEST")
     log(f"name={name}")
     log(f"uuid={uuid}")
+    log(f"attempt={attempt}/{MAX_API_ATTEMPTS}")
     log(f"model={OPENROUTER_MODEL}")
     log("web_search=true")
     log(
         f"connect_timeout={CONNECT_TIMEOUT}s "
         f"read_timeout={READ_TIMEOUT}s"
     )
-    log("max_attempts=1")
+    log(f"max_attempts={MAX_API_ATTEMPTS}")
 
     started = time.monotonic()
 
@@ -521,7 +525,9 @@ def request_openrouter(uuid, name, prompt):
 
         log(
             f"OPENROUTER CONNECT TIMEOUT "
-            f"name={name} uuid={uuid} elapsed={elapsed:.1f}s"
+            f"name={name} uuid={uuid} "
+            f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+            f"elapsed={elapsed:.1f}s"
         )
 
         raise RuntimeError(
@@ -533,7 +539,9 @@ def request_openrouter(uuid, name, prompt):
 
         log(
             f"OPENROUTER READ TIMEOUT "
-            f"name={name} uuid={uuid} elapsed={elapsed:.1f}s"
+            f"name={name} uuid={uuid} "
+            f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+            f"elapsed={elapsed:.1f}s"
         )
 
         raise RuntimeError(
@@ -545,7 +553,9 @@ def request_openrouter(uuid, name, prompt):
 
         log(
             f"OPENROUTER REQUEST ERROR "
-            f"name={name} uuid={uuid} elapsed={elapsed:.1f}s"
+            f"name={name} uuid={uuid} "
+            f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+            f"elapsed={elapsed:.1f}s"
         )
 
         raise RuntimeError(
@@ -557,6 +567,7 @@ def request_openrouter(uuid, name, prompt):
     log(
         f"OPENROUTER HTTP RESPONSE "
         f"name={name} uuid={uuid} "
+        f"attempt={attempt}/{MAX_API_ATTEMPTS} "
         f"status={response.status_code} "
         f"elapsed={elapsed:.1f}s "
         f"bytes={len(response.content)}"
@@ -566,7 +577,9 @@ def request_openrouter(uuid, name, prompt):
         body_preview = response.text[:1000].replace("\n", "\\n")
 
         log(
-            f"OPENROUTER HTTP ERROR BODY PREVIEW: "
+            f"OPENROUTER HTTP ERROR BODY PREVIEW "
+            f"name={name} uuid={uuid} "
+            f"attempt={attempt}/{MAX_API_ATTEMPTS}: "
             f"{body_preview}"
         )
 
@@ -582,7 +595,8 @@ def request_openrouter(uuid, name, prompt):
 
         log(
             f"OPENROUTER RESPONSE JSON PARSE FAILED "
-            f"name={name} uuid={uuid}"
+            f"name={name} uuid={uuid} "
+            f"attempt={attempt}/{MAX_API_ATTEMPTS}"
         )
         log(
             f"HTTP BODY PREVIEW: {body_preview}"
@@ -595,6 +609,7 @@ def request_openrouter(uuid, name, prompt):
     log(
         f"OPENROUTER RESPONSE STRUCTURE "
         f"name={name} uuid={uuid} "
+        f"attempt={attempt}/{MAX_API_ATTEMPTS} "
         f"top_level_keys={list(data.keys())}"
     )
 
@@ -607,7 +622,9 @@ def request_openrouter(uuid, name, prompt):
 
     log(
         f"OPENROUTER CHOICES "
-        f"name={name} uuid={uuid} count={len(choices)}"
+        f"name={name} uuid={uuid} "
+        f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+        f"count={len(choices)}"
     )
 
     message = choices[0].get("message")
@@ -620,6 +637,7 @@ def request_openrouter(uuid, name, prompt):
     log(
         f"OPENROUTER MESSAGE FOUND "
         f"name={name} uuid={uuid} "
+        f"attempt={attempt}/{MAX_API_ATTEMPTS} "
         f"message_keys={list(message.keys())}"
     )
 
@@ -629,6 +647,7 @@ def request_openrouter(uuid, name, prompt):
         log(
             f"OPENROUTER REFUSAL "
             f"name={name} uuid={uuid} "
+            f"attempt={attempt}/{MAX_API_ATTEMPTS} "
             f"refusal={str(refusal)[:1000]}"
         )
 
@@ -646,10 +665,58 @@ def request_openrouter(uuid, name, prompt):
     log(
         f"OPENROUTER AI CONTENT RECEIVED "
         f"name={name} uuid={uuid} "
+        f"attempt={attempt}/{MAX_API_ATTEMPTS} "
         f"content_length={len(content)}"
     )
 
     return content
+
+
+def request_openrouter(uuid, name, prompt):
+    last_error = None
+
+    for attempt in range(1, MAX_API_ATTEMPTS + 1):
+        try:
+            return request_openrouter_once(
+                uuid=uuid,
+                name=name,
+                prompt=prompt,
+                attempt=attempt,
+            )
+
+        except Exception as exc:
+            last_error = exc
+
+            log(
+                f"OPENROUTER ATTEMPT FAILED "
+                f"name={name} uuid={uuid} "
+                f"attempt={attempt}/{MAX_API_ATTEMPTS} "
+                f"error_type={type(exc).__name__} "
+                f"message={exc}"
+            )
+
+            if attempt >= MAX_API_ATTEMPTS:
+                log(
+                    f"OPENROUTER ALL ATTEMPTS FAILED "
+                    f"name={name} uuid={uuid} "
+                    f"attempts={MAX_API_ATTEMPTS}"
+                )
+                raise
+
+            delay = RETRY_DELAYS[attempt - 1]
+
+            log(
+                f"OPENROUTER RETRY SCHEDULED "
+                f"name={name} uuid={uuid} "
+                f"next_attempt={attempt + 1}/{MAX_API_ATTEMPTS} "
+                f"wait={delay}s"
+            )
+
+            time.sleep(delay)
+
+    raise RuntimeError(
+        f"OpenRouter failed after {MAX_API_ATTEMPTS} attempts: {last_error}"
+    )
 
 
 def research(uuid, name):
@@ -733,18 +800,6 @@ def research(uuid, name):
             "last_attempted_at": finished_at,
             "last_attempt_result": "success",
         }
-
-        existing = get_existing_result(uuid)
-
-        if (
-            existing is not None
-            and existing.get("status") in ALLOWED_STATUS
-        ):
-            log(
-                f"EXISTING SUCCESS RESULT PROTECTED "
-                f"name={name} uuid={uuid} "
-                f"status={existing.get('status')}"
-            )
 
         upsert_result(result)
 
