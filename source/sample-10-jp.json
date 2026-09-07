@@ -46,13 +46,13 @@
   {
     "uuid": "5393ac4b-e2fb-5b7e-a9cc-ef162c72c1c0",
     "name": "Mikado帝",
-    "reading": "",
-    "source": "",
-    "source_type": "",
-    "confidence": "unknown",
-    "status": "pending",
-    "checked_at": "",
-    "notes": ""
+    "reading": "みかど",
+    "source": "https://vtuber-live.net/channel/UCO-FZDAG0mOvgu6jmGg1tiA, https://virtual-youtuber.userlocal.jp/user/3A0A4B249B64B245_97f6a7",
+    "source_type": "trustworthy third-party",
+    "confidence": "medium",
+    "status": "verified",
+    "checked_at": "2026-09-07T02:07:46Z",
+    "notes": "The reading 'みかど' is explicitly stated in multiple third-party databases: vtuber-live.net states '名前 帝（みかど）' and virtual-youtuber.userlocal.jp states '帝(みかど)'. Jisho.org also confirms '帝' is read as 'みかど' (emperor/mikado)."
   },
   {
     "uuid": "d6a47ef4-34b3-507f-90e7-4e966e973cc9",
