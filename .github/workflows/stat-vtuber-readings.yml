@@ -1,0 +1,30 @@
+name: Stat VTuber readings
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stat:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Generate statistics
+        run: python scripts/stat_vtuber_readings.py
+
+      - name: Upload statistics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vtuber-readings-stat
+          path: vtuber-readings-stat.txt
+          if-no-files-found: error
