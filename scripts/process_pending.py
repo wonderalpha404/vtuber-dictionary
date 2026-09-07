@@ -1,581 +1,328 @@
 #!/usr/bin/env python3
 """
-Batch processor: call existing scripts/research_one_vtuber.py for pending entries.
+Batch processor that selects Japanese-target vtubers from source/vdb.json
+and runs scripts/research_one_vtuber.py for up to --count eligible UUIDs.
 
-Behavior:
-- Operates only on source/sample-10-jp.json.
-- Select candidates where status == "pending" and last_attempt_result != "error".
-- For each candidate up to --count:
-  - Call RESEARCH_SCRIPT with the vtuber name once.
+Selection rules (per spec):
+- Read source/vdb.json (read-only).
+- Read source/vtuber-readings.json (if missing, treat as empty array).
+- Japanese targets: vdb entry where type == "vtuber" and name is dict and name.jp exists and not empty.
+- Exclude any UUID that already has a result in vtuber-readings.json with status in {verified,review,unknown}.
+- Exclude any UUID for which vtuber-readings.json currently contains pending with last_attempt_result == "error".
+- Process up to --count in VDB order.
+- For each: call research_one_vtuber.py <uuid>
   - Success criteria:
-      * research script exit code == 0
-      * target record exists after run
-      * target record status is one of ("verified","review","unknown")
-      * checked_at was updated by this run (different from previous checked_at)
-  - On success: clear last_attempt_result/last_attempted_at if present.
-  - On failure: do NOT change status; set last_attempted_at,
-    last_attempt_result="error" and append stderr/stdout to notes.
-- Writes source/sample-10-jp.json when processing produces changes.
-
-This script also prints detailed progress information to the GitHub Actions log.
+    * process exit code == 0
+    * vtuber-readings.json contains an entry for the uuid after the run
+    * that entry's status is one of {"verified","review","unknown"}
+    * that entry's checked_at is present and different from previous checked_at (or newly present)
+  - On success: count as succeeded
+  - On failure: write minimal failure state in vtuber-readings.json (research script does this), and log detailed reason (without storing details in JSON)
+- Print header, per-item logs, and summary as specified.
 """
-
 import argparse
 import json
-import os
 import subprocess
 import sys
+import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
-
-# Repository root
 ROOT = Path(__file__).resolve().parent.parent
-
-SAMPLE_PATH = ROOT / "source" / "sample-10-jp.json"
 VDB_PATH = ROOT / "source" / "vdb.json"
+READINGS_PATH = ROOT / "source" / "vtuber-readings.json"
 RESEARCH_SCRIPT = ROOT / "scripts" / "research_one_vtuber.py"
 
 VALID_TARGET_STATUSES = {"verified", "review", "unknown"}
 
 
-def load_sample():
-    with SAMPLE_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def load_vdb_count() -> Optional[int]:
-    """
-    Return the number of records in source/vdb.json if available.
-
-    This is informational only.
-    The VDB itself is never modified by this script.
-    """
-    if not VDB_PATH.exists():
-        return None
-
+def load_json_file(path: Path):
     try:
-        with VDB_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
         return None
-
-    if isinstance(data, list):
-        return len(data)
-
-    if isinstance(data, dict):
-        for key in ("data", "items", "vtubers", "results"):
-            value = data.get(key)
-            if isinstance(value, list):
-                return len(value)
-
-    return None
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in {path}: {e}", file=sys.stderr)
+        raise
 
 
-def write_sample(data):
-    with SAMPLE_PATH.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def write_json_file(path: Path, obj):
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
         f.write("\n")
 
 
-def iso_now():
-    return datetime.now(timezone.utc).astimezone().isoformat()
+def iso_now_utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def run_research_for(name: str):
-    cmd = [
-        sys.executable,
-        str(RESEARCH_SCRIPT),
-        name,
-    ]
+def read_vdb() -> Dict:
+    data = load_json_file(VDB_PATH)
+    if data is None:
+        raise SystemExit(f"Error: {VDB_PATH} not found")
+    if not isinstance(data, dict):
+        raise SystemExit(f"Error: {VDB_PATH} does not contain a JSON object")
+    return data
 
-    proc = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=os.environ,
-    )
 
+def read_readings() -> List[Dict]:
+    data = load_json_file(READINGS_PATH)
+    if data is None:
+        return []
+    if not isinstance(data, list):
+        raise SystemExit(f"Error: {READINGS_PATH} is not a JSON array")
+    return data
+
+
+def vtbs_japanese_targets(vdb: Dict) -> List[Dict]:
+    vtbs = vdb.get("vtbs", [])
+    targets = []
+    for t in vtbs:
+        if t.get("type") != "vtuber":
+            continue
+        name_obj = t.get("name")
+        if not isinstance(name_obj, dict):
+            continue
+        jp = name_obj.get("jp")
+        if jp is None:
+            continue
+        if isinstance(jp, str) and jp.strip() == "":
+            continue
+        targets.append(t)
+    return targets
+
+
+def build_readings_index(readings: List[Dict]) -> Dict[str, Dict]:
+    idx = {}
+    for r in readings:
+        u = r.get("uuid")
+        if u:
+            idx[u] = r
+    return idx
+
+
+def run_research(uuid: str) -> Tuple[int, str, str]:
+    # Call research script with same environment so OPENROUTER_API_KEY is available
+    cmd = [sys.executable, str(RESEARCH_SCRIPT), uuid]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=os.environ)
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def find_record_by_name(sample: list, name: str) -> Optional[dict]:
-    for rec in sample:
-        if rec.get("name") == name:
-            return rec
+def print_batch_header(vdb_total: int, jap_total: int, readings_total: int,
+                       verified_count: int, review_count: int, unknown_count: int,
+                       pending_count: int, pending_error_count: int,
+                       eligible_before: int, requested_count: int, will_process: int,
+                       selected_records: List[Dict]):
+    print("BATCH PROCESSING STATUS\n")
+    print(f"VDB total records: {vdb_total}")
+    print(f"Japanese target records (name.jp): {jap_total}")
+    print(f"Processed result records: {readings_total}")
+    print(f"verified: {verified_count}")
+    print(f"review: {review_count}")
+    print(f"unknown: {unknown_count}")
+    print(f"pending: {pending_count}")
+    print(f"pending with previous error: {pending_error_count}")
+    print(f"Eligible for normal batch: {eligible_before}")
+    print(f"Requested maximum count: {requested_count}")
+    print(f"Will process in this run: {will_process}\n")
 
-    return None
-
-
-def get_counts(sample: list):
-    total = len(sample)
-
-    verified = 0
-    review = 0
-    unknown = 0
-    pending = 0
-    pending_error = 0
-    eligible = 0
-
-    for rec in sample:
-        status = rec.get("status")
-
-        if status == "verified":
-            verified += 1
-
-        elif status == "review":
-            review += 1
-
-        elif status == "unknown":
-            unknown += 1
-
-        elif status == "pending":
-            pending += 1
-
-            if rec.get("last_attempt_result") == "error":
-                pending_error += 1
-            else:
-                eligible += 1
-
-    return {
-        "total": total,
-        "verified": verified,
-        "review": review,
-        "unknown": unknown,
-        "pending": pending,
-        "pending_error": pending_error,
-        "eligible": eligible,
-    }
-
-
-def print_initial_status(sample: list, count: int, vdb_count: Optional[int]):
-    counts = get_counts(sample)
-
-    print("")
-    print("========================================")
-    print("BATCH PROCESSING STATUS")
-    print("========================================")
-
-    print(f"Dataset: {SAMPLE_PATH.relative_to(ROOT)}")
-    print(f"Total records in current dataset: {counts['total']}")
-
-    if vdb_count is not None:
-        print(f"VDB total records: {vdb_count}")
-    else:
-        print("VDB total records: unavailable")
-
-    print("")
-    print(f"verified: {counts['verified']}")
-    print(f"review: {counts['review']}")
-    print(f"unknown: {counts['unknown']}")
-    print(f"pending: {counts['pending']}")
-    print(f"pending with previous error: {counts['pending_error']}")
-    print(f"Eligible for normal batch: {counts['eligible']}")
-    print(f"Requested maximum count: {count}")
-
-    will_process = min(counts["eligible"], count)
-
-    print(f"Will process in this run: {will_process}")
-
-    print("")
-    print("VDB completion status: NOT DETERMINED BY CURRENT DATASET")
-    print("========================================")
+    print("Eligible records selected for this batch:")
+    for r in selected_records:
+        name = (r.get("name") or {}).get("jp") if isinstance(r.get("name"), dict) else None
+        print(f"- name={name} uuid={r.get('uuid')}")
     print("")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--count",
-        type=int,
-        required=True,
-        help="最大処理件数（正の整数）",
-    )
-
-    args = parser.parse_args()
-
-    if args.count <= 0:
+    p = argparse.ArgumentParser()
+    p.add_argument("--count", type=int, required=True, help="Maximum number of items to process (positive integer)")
+    args = p.parse_args()
+    if args.count is None or args.count <= 0:
         raise SystemExit("count must be a positive integer")
 
-    # Load current sample dataset.
-    sample = load_sample()
+    # Load VDB and readings
+    vdb = read_vdb()
+    vtbs = vdb.get("vtbs", [])
+    vdb_total = len(vtbs)
 
-    # VDB count is informational only.
-    vdb_count = load_vdb_count()
+    readings = read_readings()
+    readings_idx = build_readings_index(readings)
+    readings_total = len(readings)
 
-    # Show status before processing.
-    print_initial_status(
-        sample,
-        args.count,
-        vdb_count,
-    )
+    # Count statuses in readings
+    verified_count = sum(1 for r in readings if r.get("status") == "verified")
+    review_count = sum(1 for r in readings if r.get("status") == "review")
+    unknown_count = sum(1 for r in readings if r.get("status") == "unknown")
+    pending_count = sum(1 for r in readings if r.get("status") == "pending")
+    pending_error_count = sum(1 for r in readings if r.get("status") == "pending" and r.get("last_attempt_result") == "error")
 
-    # Build candidate list in original order.
-    candidates = []
+    jap_targets = vtbs_japanese_targets(vdb)
+    jap_total = len(jap_targets)
 
-    for rec in sample:
-        if rec.get("status") != "pending":
+    # Determine eligible targets: those japanese-target UUIDs that are not already present with status in VALID_TARGET_STATUSES
+    eligible = []
+    for t in jap_targets:
+        uuid = t.get("uuid")
+        existing = readings_idx.get(uuid)
+        if existing and existing.get("status") in VALID_TARGET_STATUSES:
             continue
-
-        if rec.get("last_attempt_result") == "error":
+        # Exclude pending with last_attempt_result == "error"
+        if existing and existing.get("status") == "pending" and existing.get("last_attempt_result") == "error":
             continue
+        eligible.append(t)
 
-        candidates.append(rec)
+    eligible_before = len(eligible)
+    requested_count = args.count
+    to_process = eligible[:requested_count]
+    will_process = len(to_process)
 
-    eligible_before_batch = len(candidates)
+    # Print header and selected list
+    print_batch_header(vdb_total, jap_total, readings_total,
+                       verified_count, review_count, unknown_count,
+                       pending_count, pending_error_count,
+                       eligible_before, requested_count, will_process,
+                       to_process)
 
-    to_process = candidates[:args.count]
-
-    # ---------------------------------------------------------
-    # No eligible records
-    # ---------------------------------------------------------
-
-    if not to_process:
-        counts = get_counts(sample)
-
-        print("========================================")
-        print("NO ELIGIBLE RECORDS")
-        print("========================================")
-
-        if counts["pending"] == 0:
-            print("BATCH STATUS: CURRENT DATASET COMPLETE")
-            print(
-                "There are no pending records remaining "
-                "in the current dataset."
-            )
-
-        elif counts["pending_error"] == counts["pending"]:
-            print("BATCH STATUS: NO ELIGIBLE RECORDS")
-            print(
-                "Pending records exist, but all remaining pending "
-                "records are previously failed records."
-            )
-
-        else:
-            print("BATCH STATUS: NO ELIGIBLE RECORDS")
-            print(
-                "There are currently no records eligible "
-                "for normal batch processing."
-            )
-
-        print("")
-        print(
-            "This does NOT mean the entire VDB has been processed."
-        )
-        print("VDB STATUS: NOT DETERMINED")
-
-        print("========================================")
-
-        return
-
-    # ---------------------------------------------------------
-    # Process records
-    # ---------------------------------------------------------
-
-    changes_made = False
     attempted = 0
     succeeded = 0
     failed = 0
 
-    print("Eligible records selected for this batch:")
-
-    for rec in to_process:
-        print(
-            f"- name={rec.get('name')} "
-            f"uuid={rec.get('uuid')}"
-        )
-
-    print("")
-
-    for rec in to_process:
-        name = rec.get("name")
-        uuid = rec.get("uuid")
-
+    for i, t in enumerate(to_process, start=1):
         attempted += 1
-
-        print("========================================")
-        print(f"Processing ({attempted}/{len(to_process)})")
-        print(f"name={name}")
+        uuid = t.get("uuid")
+        name_jp = (t.get("name") or {}).get("jp") if isinstance(t.get("name"), dict) else None
+        print(f"Processing ({i}/{will_process})")
+        print(f"name={name_jp}")
         print(f"uuid={uuid}")
-        print("========================================")
 
-        prev_checked_at = rec.get("checked_at")
+        # Previous checked_at from readings (if any)
+        prev_checked_at = None
+        existing = readings_idx.get(uuid)
+        if existing:
+            prev_checked_at = existing.get("checked_at")
 
-        ret, out, err = run_research_for(name)
+        ret, out, err = run_research(uuid)
 
-        # Reload the dataset because research_one_vtuber.py
-        # modifies the JSON file itself.
-        sample_after = load_sample()
-
-        matched = find_record_by_name(
-            sample_after,
-            name,
-        )
+        # After run, reload readings file to inspect whether a result was written/updated
+        new_readings = read_readings()
+        new_idx = build_readings_index(new_readings)
+        new_entry = new_idx.get(uuid)
 
         success = False
-
-        if ret == 0 and matched is not None:
-            new_status = matched.get("status")
-            new_checked_at = matched.get("checked_at")
-
-            if (
-                new_status in VALID_TARGET_STATUSES
-                and new_checked_at
-                and new_checked_at != prev_checked_at
-            ):
-                success = True
-
-        # -----------------------------------------------------
-        # Success
-        # -----------------------------------------------------
+        reason = ""
+        if ret != 0:
+            # research script signaled an error; per spec, it should have written failure-state, but we still detect
+            reason = f"research script exit code {ret}"
+        elif new_entry is None:
+            reason = "no result written to vtuber-readings.json"
+        else:
+            new_status = new_entry.get("status")
+            new_checked_at = new_entry.get("checked_at")
+            if new_status in VALID_TARGET_STATUSES:
+                if not new_checked_at:
+                    reason = "missing checked_at in result"
+                elif new_checked_at == prev_checked_at:
+                    reason = "checked_at not updated by this run"
+                else:
+                    success = True
+            else:
+                # Could be pending (failure state) written by research script
+                if new_status == "pending":
+                    # treat as failure per spec
+                    reason = "research wrote pending (failure) state"
+                else:
+                    reason = f"invalid status in result: {new_status}"
 
         if success:
             succeeded += 1
-
-            print("")
             print("RESULT: SUCCESS")
-            print(f"name={name}")
+            print(f"name={name_jp}")
             print(f"uuid={uuid}")
-            print(f"status={matched.get('status')}")
-            print(f"checked_at={matched.get('checked_at')}")
-
-            # Clear previous error markers if present.
-            for i, current_rec in enumerate(sample_after):
-                if current_rec.get("name") == name:
-                    sample_after[i].pop(
-                        "last_attempt_result",
-                        None,
-                    )
-                    sample_after[i].pop(
-                        "last_attempted_at",
-                        None,
-                    )
-                    break
-
-            write_sample(sample_after)
-            changes_made = True
-
-        # -----------------------------------------------------
-        # Failure
-        # -----------------------------------------------------
-
+            print(f"status={new_entry.get('status')}")
+            print(f"checked_at={new_entry.get('checked_at')}")
+            # Update index for subsequent checks
+            readings_idx[uuid] = new_entry
         else:
             failed += 1
-
-            now = iso_now()
-
-            print("")
             print("RESULT: FAILED")
-            print(f"name={name}")
+            print(f"name={name_jp}")
             print(f"uuid={uuid}")
             print(f"exit_code={ret}")
-
-            if out:
-                print("")
-                print("stdout:")
-                print(out.strip())
-
+            print(f"reason={reason}")
             if err:
-                print("")
+                err_snippet = err.strip()
+                if len(err_snippet) > 2000:
+                    err_snippet = err_snippet[:2000] + "...(truncated)"
                 print("stderr:")
-                print(err.strip())
+                print(err_snippet)
+            # Per spec: failure state should be saved to vtuber-readings.json by research script,
+            # but we do not store detailed error info there.
 
-            note_lines = [
-                (
-                    f"Auto-batch attempt at {now}: "
-                    f"research_one_vtuber.py exit_code={ret}"
-                )
-            ]
+        print("")
 
-            if out:
-                note_lines.append(
-                    f"stdout: {out.strip()}"
-                )
-
-            if err:
-                note_lines.append(
-                    f"stderr: {err.strip()}"
-                )
-
-            updated = False
-
-            for i, current_rec in enumerate(sample_after):
-                if current_rec.get("name") == name:
-                    existing_notes = current_rec.get(
-                        "notes",
-                        "",
-                    )
-
-                    append_text = "\n".join(note_lines)
-
-                    if existing_notes:
-                        current_rec["notes"] = (
-                            existing_notes
-                            + "\n"
-                            + append_text
-                        )
-                    else:
-                        current_rec["notes"] = append_text
-
-                    current_rec["last_attempted_at"] = now
-                    current_rec["last_attempt_result"] = "error"
-
-                    updated = True
-                    break
-
-            if updated:
-                write_sample(sample_after)
-                changes_made = True
-
-                print("")
-                print(
-                    "Recorded failure in sample dataset."
-                )
-                print(
-                    "Status remains pending."
-                )
-
-            else:
-                print(
-                    "WARNING: Could not locate record after run "
-                    "to mark failure."
-                )
-
-    # ---------------------------------------------------------
     # Final summary
-    # ---------------------------------------------------------
+    final_readings = read_readings()
+    final_idx = build_readings_index(final_readings)
+    final_total = len(final_readings)
+    final_verified = sum(1 for r in final_readings if r.get("status") == "verified")
+    final_review = sum(1 for r in final_readings if r.get("status") == "review")
+    final_unknown = sum(1 for r in final_readings if r.get("status") == "unknown")
+    final_pending = sum(1 for r in final_readings if r.get("status") == "pending")
+    final_pending_error = sum(1 for r in final_readings if r.get("status") == "pending" and r.get("last_attempt_result") == "error")
 
-    final_sample = load_sample()
-    final_counts = get_counts(final_sample)
+    remaining_eligible = 0
+    for t in jap_targets:
+        uuid = t.get("uuid")
+        existing = final_idx.get(uuid)
+        if existing and existing.get("status") in VALID_TARGET_STATUSES:
+            continue
+        # pending with error are excluded
+        if existing and existing.get("status") == "pending" and existing.get("last_attempt_result") == "error":
+            continue
+        remaining_eligible += 1
 
-    remaining_eligible = final_counts["eligible"]
-
-    print("")
-    print("========================================")
-    print("BATCH SUMMARY")
-    print("========================================")
-
-    print(
-        f"Current dataset: "
-        f"{SAMPLE_PATH.relative_to(ROOT)}"
-    )
-
-    print(
-        f"Total records: "
-        f"{final_counts['total']}"
-    )
-
-    if vdb_count is not None:
-        print(
-            f"VDB total records: "
-            f"{vdb_count}"
-        )
-
-    print(
-        f"verified: "
-        f"{final_counts['verified']}"
-    )
-
-    print(
-        f"review: "
-        f"{final_counts['review']}"
-    )
-
-    print(
-        f"unknown: "
-        f"{final_counts['unknown']}"
-    )
-
-    print(
-        f"pending: "
-        f"{final_counts['pending']}"
-    )
-
-    print(
-        f"pending_error: "
-        f"{final_counts['pending_error']}"
-    )
-
-    print(
-        f"Eligible before batch: "
-        f"{eligible_before_batch}"
-    )
-
-    print(
-        f"Requested count: "
-        f"{args.count}"
-    )
-
-    print(
-        f"Attempted this run: "
-        f"{attempted}"
-    )
-
-    print(
-        f"Succeeded this run: "
-        f"{succeeded}"
-    )
-
-    print(
-        f"Failed this run: "
-        f"{failed}"
-    )
-
-    print(
-        f"Remaining eligible: "
-        f"{remaining_eligible}"
-    )
-
+    print("BATCH SUMMARY\n")
+    print(f"VDB total records: {vdb_total}")
+    print(f"Japanese target records: {jap_total}")
+    print(f"Processed result records: {final_total}")
+    print(f"verified: {final_verified}")
+    print(f"review: {final_review}")
+    print(f"unknown: {final_unknown}")
+    print(f"pending: {final_pending}")
+    print(f"pending_error: {final_pending_error}")
+    print(f"Eligible before batch: {eligible_before}")
+    print(f"Requested count: {requested_count}")
+    print(f"Attempted this run: {attempted}")
+    print(f"Succeeded this run: {succeeded}")
+    print(f"Failed this run: {failed}")
+    print(f"Remaining eligible: {remaining_eligible}")
     print("")
 
-    if remaining_eligible > 0:
-        print(
-            "BATCH STATUS: MORE ELIGIBLE RECORDS REMAIN"
-        )
-        print(
-            "This batch processed only the requested "
-            "number of records."
-        )
-
-    elif final_counts["pending"] == 0:
-        print(
-            "BATCH STATUS: CURRENT DATASET COMPLETE"
-        )
-        print(
-            "There are no pending records remaining "
-            "in the current dataset."
-        )
-
-    elif final_counts["pending_error"] == final_counts["pending"]:
-        print(
-            "BATCH STATUS: NO ELIGIBLE RECORDS"
-        )
-        print(
-            "All remaining pending records have previous "
-            "errors and are excluded from normal batch processing."
-        )
-
+    # Completion status messages per spec
+    if remaining_eligible == 0:
+        # Now require that all japanese targets have successful records (verified/review/unknown)
+        all_complete = True
+        for t in jap_targets:
+            uuid = t.get("uuid")
+            existing = final_idx.get(uuid)
+            if not existing or existing.get("status") not in VALID_TARGET_STATUSES:
+                all_complete = False
+                break
+        if all_complete:
+            print("BATCH STATUS: JAPANESE TARGETS COMPLETE")
+        else:
+            # If none eligible for normal batch because only pending errors remain, show NO ELIGIBLE RECORDS
+            if final_pending_error > 0:
+                print("BATCH STATUS: NO ELIGIBLE RECORDS")
+                print("Pending records remain with previous errors.")
+                print("These records are excluded from normal batch processing.")
+            else:
+                print("BATCH STATUS: MORE ELIGIBLE RECORDS REMAIN")
     else:
-        print(
-            "BATCH STATUS: NO ELIGIBLE RECORDS"
-        )
-
-    print("")
+        print("BATCH STATUS: MORE ELIGIBLE RECORDS REMAIN")
     print("VDB STATUS: NOT DETERMINED")
-    print(
-        "Completion of the current dataset does not prove "
-        "that the entire VDB has been processed."
-    )
-
-    print("========================================")
-
-    if not changes_made:
-        print(
-            "No changes were made to the sample file."
-        )
 
 
 if __name__ == "__main__":
